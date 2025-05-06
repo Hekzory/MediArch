@@ -1,0 +1,169 @@
+[project]
+name = "mediarch"
+version = "0.1.0"
+readme = "README.md"
+requires-python = ">=3.13"
+license = "MIT"
+authors = [{ name = "Hekzory", email = "oleg@tsv.one" }]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.13",
+]
+dependencies = ["flask>=3.1.0", "sqlalchemy>=2.0.40"]
+
+  [project.urls]
+  Homepage = "https://github.com/Hekzory/MediArch"
+  Issues = "https://github.com/Hekzory/MediArch/issues"
+
+  [project.optional-dependencies]
+  dev = [
+    "pytest>=8.3.5",
+    "pytest-icdiff>=0.9",
+    "pytest-cov>=6.1.1",
+    "ruff>=0.11.8",
+  ]
+
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+exclude = [
+  "/.github",
+  "/docs",
+  "/.pytest_cache",
+  "/.ruff_cache",
+  "/.vscode",
+  "/tests",
+  "/.gitignore",
+  "/.gitattributes",
+  "/dist",
+  "/.venv",
+  "/__pycache__",
+]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+  [tool.hatch.build.targets.wheel]
+  packages = ["src/mediarch"]
+
+  [tool.hatch.build.targets.sdist]
+  include = ["/src", "/tests", "README.md", "LICENSE"]
+
+[tool.ruff]
+src = ["src"]
+# Exclude a variety of commonly ignored directories
+exclude = [
+  ".bzr",
+  ".direnv",
+  ".eggs",
+  ".git",
+  ".git-rewrite",
+  ".hg",
+  ".ipynb_checkpoints",
+  ".mypy_cache",
+  ".nox",
+  ".pants.d",
+  ".pyenv",
+  ".pytest_cache",
+  ".pytype",
+  ".ruff_cache",
+  ".svn",
+  ".tox",
+  ".venv",
+  ".vscode",
+  "__pypackages__",
+  "_build",
+  "buck-out",
+  "build",
+  "dist",
+  "node_modules",
+  "site-packages",
+  "venv",
+]
+
+line-length = 120
+indent-width = 4
+target-version = "py313"
+
+  [tool.ruff.lint]
+  select = [
+    "E",
+    "F",
+    "W",
+    "PERF",
+    "RUF",
+    "UP",
+    "C",
+    "I",
+    "YTT",
+    "ASYNC",
+    "PL",
+    "FURB",
+    "NPY",
+    "TC",
+    "B",
+    "A",
+    "C4",
+    "FA",
+    "PIE",
+    "PYI",
+    "PT",
+    "RSE",
+    "RET",
+    "SIM",
+    "SLOT",
+    "TC",
+    "FLY",
+    "T10",
+  ]
+  ignore = [
+    "PLR2004",
+    "RUF002",
+    "RUF003",
+    "RUF001",
+    "FURB118",
+    "PLR0913",
+    "PLR0917",
+    "PLR0915",
+  ]
+  fixable = ["ALL"]
+  unfixable = []
+  dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+  preview = true
+
+  [tool.ruff.format]
+  quote-style = "double"
+  indent-style = "space"
+  skip-magic-trailing-comma = false
+  line-ending = "auto"
+  docstring-code-format = false
+  docstring-code-line-length = "dynamic"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-v"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "def __repr__",
+  "raise NotImplementedError",
+  "if __name__ == .__main__.:",
+  "pass",
+  "raise ImportError",
+  "except ImportError:",
+  "except Exception as e:",     # usually too broad to test
+  "except KeyboardInterrupt:",
+]
+show_missing = true
+fail_under = 0
