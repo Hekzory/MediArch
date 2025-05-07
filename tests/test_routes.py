@@ -52,3 +52,45 @@ def test_add_patient(client):
     assert b"Patient added successfully" in response.data
     assert b"Jane" in response.data
     assert b"Smith" in response.data
+
+
+def test_view_patient(client):
+    # Get the first patient (John Doe from fixture)
+    response = client.get("/patients/1")
+    assert response.status_code == 200
+    assert b"John" in response.data
+    assert b"Doe" in response.data
+
+
+def test_edit_patient(client):
+    response = client.post("/patients/1/edit", data={
+        "first_name": "Johnny",
+        "last_name": "Doeson",
+        "birth_date": "1985-05-15"
+    }, follow_redirects=True)
+
+    assert response.status_code == 200
+    assert b"Patient updated successfully" in response.data
+    assert b"Johnny" in response.data
+    assert b"Doeson" in response.data
+
+
+def test_delete_patient(client):
+    # First add a patient to delete
+    client.post("/patients/add", data={
+        "first_name": "Deleter",
+        "last_name": "Me",
+    })
+
+    # Get all patients to find the ID of the new patient
+    response = client.get("/patients")
+    assert b"Deleter" in response.data
+
+    # Delete the patient (assuming it's ID 2)
+    response = client.get("/patients/2/delete", follow_redirects=True)
+    assert response.status_code == 200
+    assert b"Patient deleted successfully" in response.data
+
+    # Verify the patient is no longer in the list
+    response = client.get("/patients")
+    assert b"Deleter" not in response.data

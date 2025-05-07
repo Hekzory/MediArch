@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
+from werkzeug.exceptions import NotFound
 
 from . import db
 from .models import Patient
@@ -57,14 +58,18 @@ def add_patient() -> str:
 @bp.route("/patients/<int:patient_id>")
 def view_patient(patient_id: int) -> str:
     """View a specific patient."""
-    patient = Patient.query.get_or_404(patient_id)
+    patient = db.session.get(Patient, patient_id)
+    if patient is None:
+        raise NotFound
     return render_template("patient_detail.html", patient=patient)
 
 
 @bp.route("/patients/<int:patient_id>/edit", methods=["GET", "POST"])
 def edit_patient(patient_id: int) -> str:
     """Edit a specific patient."""
-    patient = Patient.query.get_or_404(patient_id)
+    patient = db.session.get(Patient, patient_id)
+    if patient is None:
+        raise NotFound
 
     if request.method == "POST":
         patient.first_name = request.form.get("first_name")
@@ -92,7 +97,9 @@ def edit_patient(patient_id: int) -> str:
 @bp.route("/patients/<int:patient_id>/delete")
 def delete_patient(patient_id: int) -> str:
     """Delete a patient."""
-    patient = Patient.query.get_or_404(patient_id)
+    patient = db.session.get(Patient, patient_id)
+    if patient is None:
+        raise NotFound
 
     db.session.delete(patient)
     db.session.commit()
