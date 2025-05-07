@@ -134,9 +134,11 @@ target-version = "py313"
     "RUF003",
     "RUF001",
     "FURB118",
+    "PLR0912",
     "PLR0913",
     "PLR0917",
     "PLR0915",
+    "C901",
   ]
   fixable = ["ALL"]
   unfixable = []

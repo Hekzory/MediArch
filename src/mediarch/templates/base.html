@@ -130,8 +130,12 @@
           <nav class="hidden md:flex items-center space-x-1">
             <a href="{{ url_for('main.index') }}" class="px-4 py-2 text-gray-300 hover:text-brand-light hover:bg-dark-600 rounded-md transition-all duration-200 ease-in-out font-medium">Home</a>
             {% if current_user.is_authenticated %}
-              <a href="{{ url_for('main.patients') }}" class="px-4 py-2 text-gray-300 hover:text-brand-light hover:bg-dark-600 rounded-md transition-all duration-200 ease-in-out font-medium">Patients</a>
-              <a href="{{ url_for('main.add_patient') }}" class="px-4 py-2 text-gray-300 hover:text-brand-light hover:bg-dark-600 rounded-md transition-all duration-200 ease-in-out font-medium">Add Patient</a>
+              {% if current_user.account_type == AccountType.ADMIN or current_user.account_type == AccountType.DOCTOR %}
+                <a href="{{ url_for('main.patients') }}" class="px-4 py-2 text-gray-300 hover:text-brand-light hover:bg-dark-600 rounded-md transition-all duration-200 ease-in-out font-medium">Patients</a>
+                <a href="{{ url_for('main.add_patient') }}" class="px-4 py-2 text-gray-300 hover:text-brand-light hover:bg-dark-600 rounded-md transition-all duration-200 ease-in-out font-medium">Add Patient</a>
+              {% elif current_user.account_type == AccountType.PATIENT and current_user.patient_id %}
+                <a href="{{ url_for('main.view_patient', patient_id=current_user.patient_id) }}" class="px-4 py-2 text-gray-300 hover:text-brand-light hover:bg-dark-600 rounded-md transition-all duration-200 ease-in-out font-medium">My Patient Card</a>
+              {% endif %}
               <span class="px-4 py-2 text-gray-400 font-medium">Hi, {{ current_user.username }}!</span>
               <a href="{{ url_for('main.logout') }}" class="px-4 py-2 text-gray-300 hover:text-brand-light hover:bg-dark-600 rounded-md transition-all duration-200 ease-in-out font-medium btn btn-secondary">Logout</a>
             {% else %}
@@ -157,8 +161,12 @@
         <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
           <a href="{{ url_for('main.index') }}" class="block px-3 py-3 rounded-md text-base font-medium text-gray-200 hover:text-brand-light hover:bg-dark-500 transition-colors duration-200">Home</a>
           {% if current_user.is_authenticated %}
-            <a href="{{ url_for('main.patients') }}" class="block px-3 py-3 rounded-md text-base font-medium text-gray-200 hover:text-brand-light hover:bg-dark-500 transition-colors duration-200">Patients</a>
-            <a href="{{ url_for('main.add_patient') }}" class="block px-3 py-3 rounded-md text-base font-medium text-gray-200 hover:text-brand-light hover:bg-dark-500 transition-colors duration-200">Add Patient</a>
+            {% if current_user.account_type == AccountType.ADMIN or current_user.account_type == AccountType.DOCTOR %}
+              <a href="{{ url_for('main.patients') }}" class="block px-3 py-3 rounded-md text-base font-medium text-gray-200 hover:text-brand-light hover:bg-dark-500 transition-colors duration-200">Patients</a>
+              <a href="{{ url_for('main.add_patient') }}" class="block px-3 py-3 rounded-md text-base font-medium text-gray-200 hover:text-brand-light hover:bg-dark-500 transition-colors duration-200">Add Patient</a>
+            {% elif current_user.account_type == AccountType.PATIENT and current_user.patient_id %}
+              <a href="{{ url_for('main.view_patient', patient_id=current_user.patient_id) }}" class="block px-3 py-3 rounded-md text-base font-medium text-gray-200 hover:text-brand-light hover:bg-dark-500 transition-colors duration-200">My Patient Card</a>
+            {% endif %}
             <span class="block px-3 py-3 rounded-md text-base font-medium text-gray-400">Hi, {{ current_user.username }}!</span>
             <a href="{{ url_for('main.logout') }}" class="block px-3 py-3 rounded-md text-base font-medium text-gray-200 hover:text-brand-light hover:bg-dark-500 transition-colors duration-200">Logout</a>
           {% else %}

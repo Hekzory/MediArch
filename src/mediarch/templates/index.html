@@ -12,8 +12,18 @@ Medical Records Management System
   <p class="text-gray-300 leading-relaxed">This is a prototype for a medical records system designed to manage patient information efficiently and securely.</p>
   
   <div class="mt-8 flex flex-wrap gap-4">
-    <a href="{{ url_for('main.patients') }}" class="btn btn-primary no-underline">View Patients</a>
-    <a href="{{ url_for('main.add_patient') }}" class="btn btn-secondary no-underline">Add New Patient</a>
+    {% if current_user.is_authenticated %}
+      {% if current_user.account_type == AccountType.ADMIN or current_user.account_type == AccountType.DOCTOR %}
+        <a href="{{ url_for('main.patients') }}" class="btn btn-primary no-underline">View Patients</a>
+        <a href="{{ url_for('main.add_patient') }}" class="btn btn-secondary no-underline">Add New Patient</a>
+      {% elif current_user.account_type == AccountType.PATIENT and current_user.patient_id %}
+        <a href="{{ url_for('main.view_patient', patient_id=current_user.patient_id) }}" class="btn btn-primary no-underline">View My Patient Card</a>
+      {% endif %}
+    {% else %}
+      {# Optionally, show generic call to action for non-logged-in users or rely on nav #}
+      <a href="{{ url_for('main.login') }}" class="btn btn-primary no-underline">Login</a>
+      <a href="{{ url_for('main.register') }}" class="btn btn-secondary no-underline">Register</a>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

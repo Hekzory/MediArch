@@ -1,8 +1,8 @@
 from flask_wtf import FlaskForm
-from wtforms import PasswordField, StringField, SubmitField
+from wtforms import PasswordField, SelectField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, ValidationError
 
-from .models import User
+from .models import AccountType, User
 
 
 class RegistrationForm(FlaskForm):
@@ -15,6 +15,16 @@ class RegistrationForm(FlaskForm):
         ],
     )
     email = StringField("Email", validators=[DataRequired(), Email(message="Invalid email address.")])
+    account_type = SelectField(
+        "Account Type",
+        choices=[(role.value, role.name.title()) for role in AccountType],
+        validators=[DataRequired()],
+        default=AccountType.PATIENT.value
+    )
+    # Fields specific to Patient account type
+    first_name = StringField("First Name", validators=[DataRequired(), Length(min=1, max=50)])
+    last_name = StringField("Last Name", validators=[DataRequired(), Length(min=1, max=50)])
+
     password = PasswordField(
         "Password",
         validators=[DataRequired(), Length(min=8, message="Password must be at least 8 characters long.")],
