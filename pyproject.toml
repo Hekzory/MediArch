@@ -16,6 +16,9 @@ dependencies = [
   "sqlalchemy>=2.0.40",
   "Flask-SQLAlchemy>=3.1.1",
   "psycopg[binary,pool]>=3.2.7",
+  "flask-login>=0.6.3",
+  "Flask-WTF>=1.2.2",
+  "email-validator>=2.1.1",
 ]
 
   [project.urls]

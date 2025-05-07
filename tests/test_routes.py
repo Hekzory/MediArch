@@ -10,10 +10,12 @@ def app():
     app = create_app(test_config={
         "TESTING": True,
         "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "WTF_CSRF_ENABLED": False,  # Disable CSRF for testing forms
+        "SECRET_KEY": "test_secret_key"  # Required for session management
     })
 
     with app.app_context():
-        db.create_all()
+        db.create_all()  # This will create both patients and users tables
 
         # Add test data
         test_patient = Patient(first_name="John", last_name="Doe")
@@ -28,6 +30,24 @@ def client(app):
     return app.test_client()
 
 
+def register_user(client, username="testuser", email="test@example.com", password="password123"):
+    """Helper function to register a user."""
+    return client.post("/register", data={
+        "username": username,
+        "email": email,
+        "password": password,
+        "confirm_password": password
+    }, follow_redirects=True)
+
+
+def login_user(client, email="test@example.com", password="password123"):
+    """Helper function to log in a user."""
+    return client.post("/login", data={
+        "email": email,
+        "password": password
+    }, follow_redirects=True)
+
+
 def test_index_page(client):
     response = client.get("/")
     assert response.status_code == 200
@@ -35,6 +55,8 @@ def test_index_page(client):
 
 
 def test_patients_list(client):
+    register_user(client)
+    login_user(client)
     response = client.get("/patients")
     assert response.status_code == 200
     assert b"John" in response.data
@@ -42,6 +64,8 @@ def test_patients_list(client):
 
 
 def test_add_patient(client):
+    register_user(client)
+    login_user(client)
     response = client.post("/patients/add", data={
         "first_name": "Jane",
         "last_name": "Smith",
@@ -55,6 +79,8 @@ def test_add_patient(client):
 
 
 def test_view_patient(client):
+    register_user(client)
+    login_user(client)
     # Get the first patient (John Doe from fixture)
     response = client.get("/patients/1")
     assert response.status_code == 200
@@ -63,6 +89,8 @@ def test_view_patient(client):
 
 
 def test_edit_patient(client):
+    register_user(client)
+    login_user(client)
     response = client.post("/patients/1/edit", data={
         "first_name": "Johnny",
         "last_name": "Doeson",
@@ -76,6 +104,8 @@ def test_edit_patient(client):
 
 
 def test_delete_patient(client):
+    register_user(client)
+    login_user(client)
     # First add a patient to delete
     client.post("/patients/add", data={
         "first_name": "Deleter",
