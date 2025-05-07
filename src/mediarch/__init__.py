@@ -12,8 +12,12 @@ DEFAULT_DB_URI = (
 )
 
 
-def create_app() -> Flask:
-    """Application factory."""
+def create_app(test_config=None) -> Flask:
+    """Application factory.
+
+    Args:
+        test_config: Optional configuration dictionary for testing
+    """
     app = Flask(__name__, template_folder="templates")
     app.config.update(
         SECRET_KEY=os.getenv("SECRET_KEY", "CHANGE-ME"),  # rotate in prod!
@@ -21,9 +25,13 @@ def create_app() -> Flask:
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
     )
 
+    # Override config with test config if provided
+    if test_config:
+        app.config.update(test_config)
+
     db.init_app(app)
 
-    from .routes import bp as main_bp
+    from .routes import bp as main_bp  # noqa: PLC0415
     app.register_blueprint(main_bp)
 
     with app.app_context():

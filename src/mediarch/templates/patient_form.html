@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en" class="h-full bg-gray-50">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if patient %}Edit Patient{% else %}Add Patient{% endif %} - MediArch</title>
+
+    <!-- Tailwind via CDN (v3.x) -->
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  </head>
+
+  <body class="h-full flex flex-col items-center px-4 py-10">
+    <header class="text-center mb-8">
+      <h1 class="text-3xl font-bold text-brand flex items-center gap-3 justify-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 inline" fill="none"
+             viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+                d="M18.364 5.636l-1.414 1.414m0 0a9 9 0 11-12.728 0m12.728 0L12 12M20.485 13.657l-1.415-1.414m-9.9 2.829l-1.415 1.414m-2.829-9.9l1.414 1.415"/>
+        </svg>
+        <a href="{{ url_for('main.index') }}">MediArch</a>
+      </h1>
+    </header>
+
+    <main class="prose max-w-prose w-full">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold">{% if patient %}Edit Patient{% else %}Add New Patient{% endif %}</h2>
+        <a href="{{ url_for('main.patients') }}" class="text-blue-600 hover:text-blue-800">Back to Patients</a>
+      </div>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">
+              {{ message }}
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <div class="bg-white p-6 rounded-lg shadow-md">
+        <form method="POST" action="{{ url_for('main.edit_patient', patient_id=patient.id) if patient else url_for('main.add_patient') }}">
+          <div class="form-group">
+            <label for="first_name" class="block text-sm font-medium text-gray-700">First Name</label>
+            <input type="text" id="first_name" name="first_name" value="{{ patient.first_name if patient else '' }}" required
+                  class="form-control mt-1 focus:ring-blue-500 focus:border-blue-500">
+          </div>
+          
+          <div class="form-group">
+            <label for="last_name" class="block text-sm font-medium text-gray-700">Last Name</label>
+            <input type="text" id="last_name" name="last_name" value="{{ patient.last_name if patient else '' }}" required
+                  class="form-control mt-1 focus:ring-blue-500 focus:border-blue-500">
+          </div>
+          
+          <div class="form-group">
+            <label for="birth_date" class="block text-sm font-medium text-gray-700">Birth Date</label>
+            <input type="date" id="birth_date" name="birth_date" value="{{ patient.birth_date if patient and patient.birth_date else '' }}"
+                  class="form-control mt-1 focus:ring-blue-500 focus:border-blue-500">
+          </div>
+          
+          <div class="form-group mt-6">
+            <button type="submit" class="btn btn-primary">
+              {% if patient %}Update Patient{% else %}Add Patient{% endif %}
+            </button>
+            <a href="{{ url_for('main.patients') }}" class="btn btn-secondary ml-2">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </main>
+
+    <!-- Custom JavaScript -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  </body>
+</html> 

@@ -2,15 +2,18 @@
 <html lang="en" class="h-full bg-gray-50">
   <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MediArch – Patient DB</title>
 
     <!-- Tailwind via CDN (v3.x) -->
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
   </head>
 
   <body class="h-full flex flex-col items-center px-4 py-10">
     <header class="text-center mb-12">
-      <h1 class="text-4xl font-extrabold text-brand flex items-center gap-3">
+      <h1 class="text-4xl font-extrabold text-brand flex items-center gap-3 justify-center">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 inline" fill="none"
              viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round"
@@ -18,25 +21,48 @@
         </svg>
         MediArch
       </h1>
-      <p class="mt-3 text-gray-600">v0.1.0-alpha</p>
+      <p class="mt-3 text-gray-600">Medical Records Management System</p>
     </header>
 
-    <main class="prose max-w-prose">
-      <p>This is a <strong>very</strong> early prototype for a medical records system.</p>
+    <main class="prose max-w-prose w-full">
+      <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+        <h2 class="text-2xl font-bold mb-4">Welcome to MediArch</h2>
+        <p>This is a prototype for a medical records system designed to manage patient information efficiently and securely.</p>
+        
+        <div class="mt-6">
+          <a href="{{ url_for('main.patients') }}" class="btn btn-primary">View Patients</a>
+          <a href="{{ url_for('main.add_patient') }}" class="btn btn-secondary ml-2">Add New Patient</a>
+        </div>
+      </div>
 
-      <h2>Next Steps</h2>
-      <ol>
-        <li>Add a form to register a new patient.</li>
-        <li>Show a table of existing patients.</li>
-        <li>Add authentication &amp; authorisation.</li>
-      </ol>
+      <div class="bg-white p-6 rounded-lg shadow-md">
+        <h2 class="text-2xl font-bold mb-4">System Overview</h2>
+        <div class="grid md:grid-cols-2 gap-4">
+          <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <h3 class="text-lg font-semibold">Features</h3>
+            <ul class="mt-2 list-disc list-inside">
+              <li>Patient registration and management</li>
+              <li>Medical history tracking</li>
+              <li>Appointment scheduling</li>
+              <li>Secure data storage</li>
+            </ul>
+          </div>
+          <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <h3 class="text-lg font-semibold">Technical Stack</h3>
+            <ul class="mt-2 list-disc list-inside">
+              <li>Python 3.13</li>
+              <li>Flask web framework</li>
+              <li>SQLAlchemy ORM</li>
+              <li>PostgreSQL database</li>
+            </ul>
+          </div>
+        </div>
+      </div>
 
-      <hr>
-
-      <p class="text-sm text-gray-500">
-        Connected to:
-        <code class="bg-gray-100 px-1 rounded">{{ config["SQLALCHEMY_DATABASE_URI"] }}</code>
-      </p>
+      <hr class="my-8">
     </main>
+
+    <!-- Custom JavaScript -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
   </body>
 </html>
