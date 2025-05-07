@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en" class="h-full bg-gray-50">
+  <head>
+    <meta charset="utf-8">
+    <title>MediArch – Patient DB</title>
+
+    <!-- Tailwind via CDN (v3.x) -->
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+  </head>
+
+  <body class="h-full flex flex-col items-center px-4 py-10">
+    <header class="text-center mb-12">
+      <h1 class="text-4xl font-extrabold text-brand flex items-center gap-3">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 inline" fill="none"
+             viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+                d="M18.364 5.636l-1.414 1.414m0 0a9 9 0 11-12.728 0m12.728 0L12 12M20.485 13.657l-1.415-1.414m-9.9 2.829l-1.415 1.414m-2.829-9.9l1.414 1.415"/>
+        </svg>
+        MediArch
+      </h1>
+      <p class="mt-3 text-gray-600">v0.1.0-alpha</p>
+    </header>
+
+    <main class="prose max-w-prose">
+      <p>This is a <strong>very</strong> early prototype for a medical records system.</p>
+
+      <h2>Next Steps</h2>
+      <ol>
+        <li>Add a form to register a new patient.</li>
+        <li>Show a table of existing patients.</li>
+        <li>Add authentication &amp; authorisation.</li>
+      </ol>
+
+      <hr>
+
+      <p class="text-sm text-gray-500">
+        Connected to:
+        <code class="bg-gray-100 px-1 rounded">{{ config["SQLALCHEMY_DATABASE_URI"] }}</code>
+      </p>
+    </main>
+  </body>
+</html>

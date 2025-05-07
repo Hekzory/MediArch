@@ -1,0 +1,31 @@
+services:
+  db:
+    image: postgres:17.4-alpine
+    container_name: mediarch-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mediarch
+      POSTGRES_PASSWORD: mediarch
+      POSTGRES_DB: mediarch
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mediarch"]
+      interval: 1s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    container_name: mediarch-web
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://mediarch:mediarch@db/mediarch
+    ports:
+      - "8000:8000"
+
+volumes:
+  db_data:
