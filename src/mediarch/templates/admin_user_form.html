@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Edit User {{ user.username }} - MediArch{% endblock %}
+
+{% block page_header %}
+<div class="mb-8 flex justify-between items-center">
+    <h1 class="text-4xl font-bold text-gray-100">Edit User: <span class="text-brand">{{ user.username }}</span></h1>
+    <a href="{{ url_for('main.admin_list_users') }}" class="btn btn-secondary">&larr; Back to Users List</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto bg-dark-700 p-8 rounded-lg shadow-xl">
+    <form method="POST" action="{{ url_for('main.admin_edit_user', user_id=user.id) }}" novalidate>
+        <div class="form-group">
+            <label for="username" class="form-label">Username</label>
+            <input type="text" id="username" name="username" class="form-control" value="{{ request.form.get('username', user.username) }}" required {% if is_super_admin %}readonly{% endif %}>
+            {% if is_super_admin %}<p class="mt-1 text-xs text-gray-400">The username of the primary 'admin' account cannot be changed.</p>{% endif %}
+        </div>
+
+        <div class="form-group">
+            <label for="email" class="form-label">Email</label>
+            <input type="email" id="email" name="email" class="form-control" value="{{ request.form.get('email', user.email) }}" required>
+        </div>
+
+        <div class="form-group">
+            <label for="account_type" class="form-label">Account Type</label>
+            <select id="account_type" name="account_type" class="form-control" {% if is_super_admin %}disabled{% endif %}>
+                {% for type in AccountType %}
+                <option value="{{ type.value }}" {% if request.form.get('account_type', user.account_type.value) == type.value %}selected{% endif %}>
+                    {{ type.name|capitalize }}
+                </option>
+                {% endfor %}
+            </select>
+            {% if is_super_admin %}
+                <input type="hidden" name="account_type" value="{{ user.account_type.value }}" />
+                <p class="mt-1 text-xs text-gray-400">The account type of the primary 'admin' account cannot be changed.</p>
+            {% endif %}
+        </div>
+        
+        {% if user.account_type == AccountType.PATIENT and user.patient_id %}
+        <div class="form-group bg-dark-600 p-4 rounded-md">
+            <p class="text-sm text-gray-300">This user is currently linked to Patient ID: <strong class="text-brand">{{ user.patient_id }}</strong>.</p>
+            <p class="text-xs text-gray-400 mt-1">If you change their account type from 'Patient' to another type, this link will be removed. The patient record itself will remain in the system but will no longer be associated with this user account.</p>
+        </div>
+        {% endif %}
+
+        <div class="form-group">
+            <label for="is_active" class="form-label">User Status</label>
+            <select id="is_active" name="is_active" class="form-control" {% if is_super_admin %}disabled{% endif %}>
+                <option value="true" {% if request.form.get('is_active', user.is_active|string) == 'true' %}selected{% endif %}>Active</option>
+                <option value="false" {% if request.form.get('is_active', user.is_active|string) == 'false' %}selected{% endif %}>Inactive / Pending Activation</option>
+            </select>
+            {% if is_super_admin %}
+                <input type="hidden" name="is_active" value="{{ user.is_active|string|lower }}" />
+                <p class="mt-1 text-xs text-gray-400">The primary 'admin' account is always active and cannot be deactivated.</p>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label for="password" class="form-label">New Password (optional)</label>
+            <input type="password" id="password" name="password" class="form-control" placeholder="Leave blank to keep current password">
+            <p class="mt-1 text-xs text-gray-400">Enter a new password only if you want to change it.</p>
+        </div>
+
+        <div class="mt-8 flex justify-end space-x-3">
+            <a href="{{ url_for('main.admin_list_users') }}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+    </form>
+</div>
+{% endblock %} 

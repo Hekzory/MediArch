@@ -43,6 +43,7 @@ class User(UserMixin, db.Model):
     email: Mapped[str] = mapped_column(unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(nullable=False)
     account_type: Mapped[AccountType] = mapped_column(default=AccountType.PATIENT, nullable=False)
+    is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
 
     # A user (if they are a patient) can be linked to their patient card
     # This patient_id refers to the id in the 'patients' table.
@@ -57,6 +58,13 @@ class User(UserMixin, db.Model):
     def check_password(self, password: str) -> bool:
         """Checks if the provided password matches the stored hash."""
         return check_password_hash(self.password_hash, password)
+
+    @property
+    def is_globally_active(self) -> bool:
+        """Determines if user account is active. The 'admin' user is always active."""
+        if self.username == "admin":
+            return True
+        return self.is_active
 
     def __repr__(self) -> str:
         return f"<User {self.username} ({self.account_type.value})>"

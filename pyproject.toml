@@ -134,6 +134,7 @@ target-version = "py313"
     "RUF003",
     "RUF001",
     "FURB118",
+    "PLR0911",
     "PLR0912",
     "PLR0913",
     "PLR0917",

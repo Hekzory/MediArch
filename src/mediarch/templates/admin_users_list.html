@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Users - MediArch{% endblock %}
+
+{% block page_header %}
+<div class="mb-8 flex justify-between items-center">
+    <h1 class="text-4xl font-bold text-gray-100">Manage Users</h1>
+    <a href="{{ url_for('main.admin_dashboard') }}" class="btn btn-secondary">&larr; Back to Admin Dashboard</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="bg-dark-700 shadow-xl rounded-lg overflow-hidden">
+    <table class="table min-w-full">
+        <thead class="bg-dark-600">
+            <tr>
+                <th scope="col" class="table-th">ID</th>
+                <th scope="col" class="table-th">Username</th>
+                <th scope="col" class="table-th">Email</th>
+                <th scope="col" class="table-th">Account Type</th>
+                <th scope="col" class="table-th">Status</th>
+                <th scope="col" class="table-th">Patient ID</th>
+                <th scope="col" class="table-th">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="bg-dark-700 divide-y divide-dark-500">
+            {% for user_item in users %}
+            <tr>
+                <td class="table-td">{{ user_item.id }}</td>
+                <td class="table-td">{{ user_item.username }}</td>
+                <td class="table-td">{{ user_item.email }}</td>
+                <td class="table-td">
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                {%- if user_item.account_type == AccountType.ADMIN %} bg-red-500 text-red-100 
+                                {%- elif user_item.account_type == AccountType.DOCTOR %} bg-blue-500 text-blue-100
+                                {%- elif user_item.account_type == AccountType.PATIENT %} bg-green-500 text-green-100
+                                {%- else %} bg-gray-500 text-gray-100 {%- endif %}">
+                        {{ user_item.account_type.value|capitalize }}
+                    </span>
+                </td>
+                <td class="table-td">
+                    {% if user_item.is_globally_active %}
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-500 text-green-100">Active</span>
+                    {% else %}
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-500 text-amber-100">Pending Activation</span>
+                    {% endif %}
+                </td>
+                <td class="table-td">{{ user_item.patient_id if user_item.patient_id is not none else 'N/A' }}</td>
+                <td class="table-td space-x-2 flex items-center">
+                    <a href="{{ url_for('main.admin_edit_user', user_id=user_item.id) }}" class="btn btn-primary text-xs !px-3 !py-1.5 whitespace-nowrap">Edit</a>
+                    {% if user_item.username != 'admin' %}
+                        <form method="POST" action="{{ url_for('main.admin_toggle_user_active', user_id=user_item.id) }}" class="inline-block">
+                            <button type="submit" 
+                                    class="btn text-xs !px-3 !py-1.5 whitespace-nowrap 
+                                           {% if user_item.is_active %}btn-secondary bg-amber-600 hover:bg-amber-700 focus:ring-amber-500 text-white{% else %}btn-secondary bg-green-600 hover:bg-green-700 focus:ring-green-500 text-white{% endif %}">
+                                {{ "Deactivate" if user_item.is_active else "Activate" }}
+                            </button>
+                        </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7" class="px-6 py-10 text-center text-gray-400">
+                    No users found.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %} 

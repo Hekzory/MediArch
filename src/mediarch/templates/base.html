@@ -130,6 +130,9 @@
           <nav class="hidden md:flex items-center space-x-1">
             <a href="{{ url_for('main.index') }}" class="px-4 py-2 text-gray-300 hover:text-brand-light hover:bg-dark-600 rounded-md transition-all duration-200 ease-in-out font-medium">Home</a>
             {% if current_user.is_authenticated %}
+              {% if current_user.account_type == AccountType.ADMIN %}
+                <a href="{{ url_for('main.admin_dashboard') }}" class="px-4 py-2 text-gray-300 hover:text-brand-light hover:bg-dark-600 rounded-md transition-all duration-200 ease-in-out font-medium">Admin Panel</a>
+              {% endif %}
               {% if current_user.account_type == AccountType.ADMIN or current_user.account_type == AccountType.DOCTOR %}
                 <a href="{{ url_for('main.patients') }}" class="px-4 py-2 text-gray-300 hover:text-brand-light hover:bg-dark-600 rounded-md transition-all duration-200 ease-in-out font-medium">Patients</a>
                 <a href="{{ url_for('main.add_patient') }}" class="px-4 py-2 text-gray-300 hover:text-brand-light hover:bg-dark-600 rounded-md transition-all duration-200 ease-in-out font-medium">Add Patient</a>
@@ -161,6 +164,9 @@
         <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
           <a href="{{ url_for('main.index') }}" class="block px-3 py-3 rounded-md text-base font-medium text-gray-200 hover:text-brand-light hover:bg-dark-500 transition-colors duration-200">Home</a>
           {% if current_user.is_authenticated %}
+            {% if current_user.account_type == AccountType.ADMIN %}
+                <a href="{{ url_for('main.admin_dashboard') }}" class="block px-3 py-3 rounded-md text-base font-medium text-gray-200 hover:text-brand-light hover:bg-dark-500 transition-colors duration-200">Admin Panel</a>
+            {% endif %}
             {% if current_user.account_type == AccountType.ADMIN or current_user.account_type == AccountType.DOCTOR %}
               <a href="{{ url_for('main.patients') }}" class="block px-3 py-3 rounded-md text-base font-medium text-gray-200 hover:text-brand-light hover:bg-dark-500 transition-colors duration-200">Patients</a>
               <a href="{{ url_for('main.add_patient') }}" class="block px-3 py-3 rounded-md text-base font-medium text-gray-200 hover:text-brand-light hover:bg-dark-500 transition-colors duration-200">Add Patient</a>

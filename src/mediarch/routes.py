@@ -17,6 +17,18 @@ def inject_account_types():
     """Inject AccountType enum into all templates."""
     return {"AccountType": AccountType}
 
+
+@bp.before_request
+def check_user_active():
+    """Check if the logged-in user is active before allowing access to most pages."""
+    if current_user.is_authenticated and not current_user.is_globally_active:
+        # Allow access to logout, index, and static files for pending activation users
+        allowed_endpoints = ["main.logout", "main.index", "static"]
+        if request.endpoint and request.endpoint not in allowed_endpoints:
+            flash("Your account is pending activation. Access is restricted.", "warning")
+            return redirect(url_for("main.index"))
+    return None
+
 # --- Role-based access control decorators ---
 
 
@@ -55,6 +67,132 @@ patient_required = role_required(AccountType.PATIENT)
 admin_or_doctor_required = roles_required([AccountType.ADMIN, AccountType.DOCTOR])
 
 # --- End Role-based access control decorators ---
+
+
+# --- Admin Panel Routes ---
+
+@bp.route("/admin")
+@login_required
+@admin_required
+def admin_dashboard() -> str:
+    """Admin dashboard page."""
+    return render_template("admin_dashboard.html")
+
+
+@bp.route("/admin/users")
+@login_required
+@admin_required
+def admin_list_users() -> str:
+    """List all users for admins."""
+    users = User.query.order_by(User.id).all()
+    return render_template("admin_users_list.html", users=users)
+
+
+@bp.route("/admin/users/<int:user_id>/edit", methods=["GET", "POST"])
+@login_required
+@admin_required
+def admin_edit_user(user_id: int) -> str:
+    """Edit a user's details (Admin only)."""
+    user_to_edit = db.session.get(User, user_id)
+    if not user_to_edit:
+        flash(f"User with ID {user_id} not found.", "danger")
+        return redirect(url_for("main.admin_list_users"))
+
+    is_super_admin = user_to_edit.username == "admin"
+
+    if request.method == "POST":
+        new_username = request.form.get("username", "").strip()
+        new_email = request.form.get("email", "").strip()
+        new_account_type_str = request.form.get("account_type")
+        # Get the string value from the form, convert to bool
+        new_is_active_str = request.form.get("is_active")
+        new_is_active = new_is_active_str == "true"  # Assuming form sends "true" or it's missing for false
+
+        # Basic validation
+        if not new_username or not new_email:
+            flash("Username and Email are required.", "danger")
+            return render_template("admin_user_form.html", user=user_to_edit, AccountType=AccountType,
+                                   is_super_admin=is_super_admin)
+
+        # Check for username/email conflicts if changed
+        if new_username != user_to_edit.username and User.query.filter_by(username=new_username).first():
+            flash(f"Username '{new_username}' is already taken.", "danger")
+            return render_template("admin_user_form.html", user=user_to_edit, AccountType=AccountType,
+                                   is_super_admin=is_super_admin)
+        if new_email != user_to_edit.email and User.query.filter_by(email=new_email).first():
+            flash(f"Email '{new_email}' is already registered.", "danger")
+            return render_template("admin_user_form.html", user=user_to_edit, AccountType=AccountType,
+                                   is_super_admin=is_super_admin)
+
+        user_to_edit.username = new_username
+        user_to_edit.email = new_email
+
+        try:
+            new_account_type = AccountType(new_account_type_str)
+            if user_to_edit.account_type == AccountType.PATIENT and new_account_type != AccountType.PATIENT \
+            and user_to_edit.patient_card:
+                flash(f"User {user_to_edit.username} was a Patient." +
+                    "Their patient card (ID: {user_to_edit.patient_id}) has been unlinked." +
+                    "The patient record still exists but is no longer associated with this user.", "info")
+                user_to_edit.patient_id = None
+                user_to_edit.patient_card = None
+            user_to_edit.account_type = new_account_type
+        except ValueError:
+            flash("Invalid account type selected.", "danger")
+            return render_template("admin_user_form.html", user=user_to_edit, AccountType=AccountType,
+                                   is_super_admin=is_super_admin)
+
+        if not is_super_admin:  # The 'admin' user's active status cannot be changed here
+            user_to_edit.is_active = new_is_active
+        elif is_super_admin and not new_is_active:
+            flash("The primary 'admin' account cannot be deactivated.", "warning")
+            # Optionally, revert new_is_active to True or simply don't apply the change if it was to False
+
+        # Password change (optional)
+        new_password = request.form.get("password")
+        if new_password:
+            user_to_edit.set_password(new_password)
+            flash("Password updated.", "info")
+
+        try:
+            db.session.commit()
+            flash("User updated successfully.", "success")
+            return redirect(url_for("main.admin_list_users"))
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error updating user: {e}", "danger")
+            # Log error e
+
+    return render_template("admin_user_form.html", user=user_to_edit, AccountType=AccountType,
+                           is_super_admin=is_super_admin)
+
+
+@bp.route("/admin/users/<int:user_id>/toggle_active", methods=["POST"])
+@login_required
+@admin_required
+def admin_toggle_user_active(user_id: int) -> str:
+    """Toggle a user's active status (Admin only)."""
+    user_to_toggle = db.session.get(User, user_id)
+    if not user_to_toggle:
+        flash(f"User with ID {user_id} not found.", "danger")
+        return redirect(url_for("main.admin_list_users"))
+
+    if user_to_toggle.username == "admin":
+        flash("The primary 'admin' account cannot be deactivated.", "warning")
+        return redirect(url_for("main.admin_list_users"))
+
+    user_to_toggle.is_active = not user_to_toggle.is_active
+    action = "activated" if user_to_toggle.is_active else "deactivated"
+    try:
+        db.session.commit()
+        flash(f"User {user_to_toggle.username} has been {action}.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error updating user status: {e}", "danger")
+        # Log error e
+    return redirect(url_for("main.admin_list_users"))
+
+# --- End Admin Panel Routes ---
 
 
 @bp.get("/")
@@ -241,6 +379,16 @@ def register() -> str:
         )
         user.set_password(form.password.data)
 
+        # Set is_active based on account type
+        if selected_account_type in {AccountType.ADMIN, AccountType.DOCTOR}:
+            if user.username == "admin":  # Ensure the main admin is always active
+                user.is_active = True
+            else:
+                user.is_active = False
+                flash("Administrator/Doctor accounts require activation by an existing administrator.", "info")
+        else:  # Patients are active by default
+            user.is_active = True
+
         if selected_account_type == AccountType.PATIENT:
             # No longer need to check if form.first_name.data or form.last_name.data exist,
             # as they are DataRequired in the form itself.
@@ -282,8 +430,12 @@ def login() -> str:
             flash("Invalid email or password.", "danger")
             return redirect(url_for("main.login"))
         login_user(user)
-        flash("Login successful.", "success")
-        # Redirect to the next page if it exists, otherwise to the index
+
+        if not user.is_globally_active:
+            flash("Login successful, but your account is pending activation by an administrator.", "success")
+        else:
+            flash("Login successful.", "success")
+        # The @bp.before_request hook will handle redirection if user is not active
         next_page = request.args.get("next")
         return redirect(next_page or url_for("main.index"))
     return render_template("login.html", title="Login", form=form)
