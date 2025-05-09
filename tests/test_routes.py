@@ -160,6 +160,29 @@ class TestAddPatientRoute(BaseTest):
         assert response.status_code == 403  # Forbidden
         client.get("/logout")
 
+    def test_add_patient_with_invalid_date_format(self, client):
+        """Tests adding a patient with an invalid birth date format."""
+        self.login_user(client, email="admin@example.com")  # Admin or Doctor can add
+        response = client.post("/patients/add", data={
+            "first_name": "InvalidDate",
+            "last_name": "TestPerson",
+            "birth_date": "01-01-1990"  # Invalid format, expecting YYYY-MM-DD
+        }, follow_redirects=True)
+        assert response.status_code == 200  # Should stay on the form page
+        assert b"Invalid date format for birth date. Please use YYYY-MM-DD format." in response.data
+        assert b"Patient added successfully" not in response.data  # Ensure patient was not added
+
+        # Also test with a completely non-date string
+        response_non_date = client.post("/patients/add", data={
+            "first_name": "NonDate",
+            "last_name": "TestAgain",
+            "birth_date": "not-a-date"
+        }, follow_redirects=True)
+        assert response_non_date.status_code == 200
+        assert b"Invalid date format for birth date. Please use YYYY-MM-DD format." in response_non_date.data
+        assert b"Patient added successfully" not in response_non_date.data
+        client.get("/logout")
+
 
 class TestViewPatientRoute(BaseTest):
     def test_admin_can_view_patient(self, client):
@@ -301,6 +324,24 @@ class TestEditPatientRoute(BaseTest):
             "last_name": "AttemptHack"
         }, follow_redirects=True)
         assert response_patient_other_edit.status_code == 403  # Forbidden
+        client.get("/logout")
+
+    def test_edit_non_existent_patient(self, client):
+        """Tests attempting to edit a non-existent patient."""
+        self.login_user(client, email="admin@example.com")  # Admin or Doctor can attempt edit
+        non_existent_patient_id = 99999
+
+        # Test GET request
+        response_get = client.get(f"/patients/{non_existent_patient_id}/edit")
+        assert response_get.status_code == 404
+
+        # Test POST request
+        response_post = client.post(f"/patients/{non_existent_patient_id}/edit", data={
+            "first_name": "Ghost",
+            "last_name": "User",
+            "birth_date": "2000-01-01"
+        }, follow_redirects=True)
+        assert response_post.status_code == 404
         client.get("/logout")
 
 
@@ -696,4 +737,22 @@ class TestLoginRedirectRoute(BaseTest):
         assert response_followed.status_code == 200
         assert b"MediArch" in response_followed.data  # Index page content
         assert b"Login" not in response_followed.data  # Should not be on login page
+        client.get("/logout")
+
+
+class TestRegisterRedirectRoute(BaseTest):
+    def test_authenticated_user_redirected_from_register(self, client):
+        """Tests that an authenticated user is redirected from the register page."""
+        # Log in an admin user
+        self.login_user(client, email="admin@example.com", password="password123")
+
+        # Attempt to access the register page
+        response = client.get("/register", follow_redirects=False)
+        assert response.status_code == 302
+        assert response.location == "/"  # Should redirect to index
+
+        response_followed = client.get("/register", follow_redirects=True)
+        assert response_followed.status_code == 200
+        assert b"MediArch" in response_followed.data  # Index page content
+        assert b"Register" not in response_followed.data  # Should not be on register page
         client.get("/logout")
