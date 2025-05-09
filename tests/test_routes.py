@@ -406,9 +406,7 @@ def test_admin_dashboard(client):
     # Test unauthenticated access
     response = client.get("/admin")
     assert response.status_code == 302  # Redirects to login
-    assert b"Redirecting..." in response.data  # Or check for url_for('main.login') in location header
-    # Alternatively, if it's 401 Unauthorized without redirect:
-    # assert response.status_code == 401
+    assert b"Redirecting..." in response.data
 
 
 def test_admin_list_users(client):
@@ -438,3 +436,19 @@ def test_admin_list_users(client):
     response = client.get("/admin/users")
     assert response.status_code == 302  # Redirects to login
     assert b"Redirecting..." in response.data
+
+def test_authenticated_user_redirect_from_login(client):
+    """Test that an authenticated user is redirected from the login page."""
+    # Log in an admin user (or any user)
+    login_user(client, email="admin@example.com", password="password123")
+
+    # Attempt to access the login page
+    response = client.get("/login", follow_redirects=False) # follow_redirects=False to check 302
+    assert response.status_code == 302
+    assert response.location == "/" # Should redirect to index
+
+    response_followed = client.get("/login", follow_redirects=True)
+    assert response_followed.status_code == 200
+    assert b"MediArch" in response_followed.data # Index page content
+    assert b"Login" not in response_followed.data # Should not be on login page
+    client.get("/logout")
