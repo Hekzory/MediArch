@@ -24,12 +24,14 @@ def app():
         db.session.add(patient1)
 
         # Admin User
-        admin_user = User(username="adminuser", email="admin@example.com", account_type=AccountType.ADMIN)
+        admin_user = User(username="admin", email="admin@example.com",
+                          account_type=AccountType.ADMIN, is_active=True)
         admin_user.set_password("password123")
         db.session.add(admin_user)
 
         # Doctor User
-        doctor_user = User(username="doctoruser", email="doctor@example.com", account_type=AccountType.DOCTOR)
+        doctor_user = User(username="doctoruser", email="doctor@example.com",
+                           account_type=AccountType.DOCTOR, is_active=True)
         doctor_user.set_password("password123")
         db.session.add(doctor_user)
 
@@ -332,3 +334,107 @@ def test_delete_patient(client):
     detail_response_admin_check = client.get("/patients/1")
     assert detail_response_admin_check.status_code == 200
     client.get("/logout")
+
+
+def test_admin_toggle_user_active(client, app):
+    # Scenario: Admin toggles another user's active status
+    # Register a new user (e.g., a doctor) by admin, who will be initially inactive
+    with app.app_context():
+        doctor_for_toggle = User(username="toggledoctor", email="toggle@doctor.com",
+                                 account_type=AccountType.DOCTOR, is_active=False)
+        doctor_for_toggle.set_password("password123")
+        db.session.add(doctor_for_toggle)
+        db.session.commit()
+        user_to_toggle_id = doctor_for_toggle.id
+
+    login_user(client, email="admin@example.com", password="password123")
+
+    # Check initial state (inactive)
+    with app.app_context():
+        user_toggled = db.session.get(User, user_to_toggle_id)
+        assert user_toggled is not None
+        assert not user_toggled.is_active
+
+    # Toggle to active
+    response_activate = client.post(f"/admin/users/{user_to_toggle_id}/toggle_active", follow_redirects=True)
+    assert response_activate.status_code == 200
+    assert b"User toggledoctor has been activated." in response_activate.data
+    with app.app_context():
+        user_toggled = db.session.get(User, user_to_toggle_id)
+        assert user_toggled.is_active
+
+    # Toggle back to inactive
+    response_deactivate = client.post(f"/admin/users/{user_to_toggle_id}/toggle_active", follow_redirects=True)
+    assert response_deactivate.status_code == 200
+    assert b"User toggledoctor has been deactivated." in response_deactivate.data
+    with app.app_context():
+        user_toggled = db.session.get(User, user_to_toggle_id)
+        assert not user_toggled.is_active
+
+    # Scenario: Admin attempts to toggle a non-existent user
+    login_user(client, email="admin@example.com", password="password123")
+    non_existent_user_id = 99999
+    response_toggle_non_existent = client.post(f"/admin/users/{non_existent_user_id}/toggle_active",
+                                               follow_redirects=True)
+    assert response_toggle_non_existent.status_code == 200  # Redirects to user list
+    assert b"User with ID 99999 not found." in response_toggle_non_existent.data
+    client.get("/logout")
+
+
+def test_admin_dashboard(client):
+    # Test with Admin
+    login_user(client, email="admin@example.com", password="password123")
+    response = client.get("/admin")
+    assert response.status_code == 200
+    assert b"Admin Dashboard" in response.data  # Assuming "Admin Dashboard" is in the template
+    client.get("/logout")
+
+    # Test with Doctor (should be forbidden)
+    login_user(client, email="doctor@example.com", password="password123")
+    response = client.get("/admin")
+    assert response.status_code == 403
+    client.get("/logout")
+
+    # Test with Patient (should be forbidden)
+    register_user(client, username="patientdash", email="patientdash@example.com",
+                  account_type_value=AccountType.PATIENT.value)
+    login_user(client, email="patientdash@example.com", password="password123")
+    response = client.get("/admin")
+    assert response.status_code == 403
+    client.get("/logout")
+
+    # Test unauthenticated access
+    response = client.get("/admin")
+    assert response.status_code == 302  # Redirects to login
+    assert b"Redirecting..." in response.data  # Or check for url_for('main.login') in location header
+    # Alternatively, if it's 401 Unauthorized without redirect:
+    # assert response.status_code == 401
+
+
+def test_admin_list_users(client):
+    # Test with Admin
+    login_user(client, email="admin@example.com", password="password123")
+    response = client.get("/admin/users")
+    assert response.status_code == 200
+    assert b"admin@example.com" in response.data  # Admin user from fixture
+    assert b"doctor@example.com" in response.data  # Doctor user from fixture
+    client.get("/logout")
+
+    # Test with Doctor (should be forbidden)
+    login_user(client, email="doctor@example.com", password="password123")
+    response = client.get("/admin/users")
+    assert response.status_code == 403
+    client.get("/logout")
+
+    # Test with Patient (should be forbidden)
+    register_user(client, username="patientlist", email="patientlist@example.com",
+                  account_type_value=AccountType.PATIENT.value)
+    login_user(client, email="patientlist@example.com", password="password123")
+    response = client.get("/admin/users")
+    assert response.status_code == 403
+    client.get("/logout")
+
+    # Test unauthenticated access
+    response = client.get("/admin/users")
+    assert response.status_code == 302  # Redirects to login
+    assert b"Redirecting..." in response.data
