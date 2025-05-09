@@ -139,6 +139,7 @@ target-version = "py313"
     "PLR0913",
     "PLR0917",
     "PLR0915",
+    "PLR6301",
     "C901",
   ]
   fixable = ["ALL"]

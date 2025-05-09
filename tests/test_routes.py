@@ -45,410 +45,479 @@ def client(app):
     return app.test_client()
 
 
-# Updated register_user helper to support account types and patient-specific fields
-def register_user(client, username="testuser", email="test@example.com", password="password123",
-                  account_type_value=AccountType.PATIENT.value, first_name="Test", last_name="User"):
-    """Helper function to register a user."""
-    data = {
-        "username": username,
-        "email": email,
-        "password": password,
-        "confirm_password": password,
-        "account_type": account_type_value
-    }
-    # Add first_name and last_name only if registering a patient
-    if account_type_value == AccountType.PATIENT.value:
-        if first_name:  # Ensure not to send empty strings if None was intended, though form expects them.
-            data["first_name"] = first_name
-        if last_name:
-            data["last_name"] = last_name
+# Base class for tests
+class BaseTest:
+    """Base class for test scenarios."""
 
-    return client.post("/register", data=data, follow_redirects=True)
+    def register_user(self, client, username="testuser", email="test@example.com",
+                     password="password123", account_type_value=AccountType.PATIENT.value,
+                     first_name="Test", last_name="User"):
+        """Helper method to register a user."""
+        data = {
+            "username": username,
+            "email": email,
+            "password": password,
+            "confirm_password": password,
+            "account_type": account_type_value
+        }
+        # Add first_name and last_name only if registering a patient
+        if account_type_value == AccountType.PATIENT.value:
+            if first_name:  # Ensure not to send empty strings if None was intended, though form expects them.
+                data["first_name"] = first_name
+            if last_name:
+                data["last_name"] = last_name
 
+        return client.post("/register", data=data, follow_redirects=True)
 
-def login_user(client, email="test@example.com", password="password123"):
-    """Helper function to log in a user."""
-    return client.post("/login", data={
-        "email": email,
-        "password": password
-    }, follow_redirects=True)
-
-
-def test_index_page(client):
-    response = client.get("/")
-    assert response.status_code == 200
-    assert b"MediArch" in response.data
+    def login_user(self, client, email="test@example.com", password="password123"):
+        """Helper method to log in a user."""
+        return client.post("/login", data={
+            "email": email,
+            "password": password
+        }, follow_redirects=True)
 
 
-def test_patients_list(client):
-    # Test with Admin
-    login_user(client, email="admin@example.com")
-    response = client.get("/patients")
-    assert response.status_code == 200
-    assert b"John" in response.data  # From fixture
-    assert b"Doe" in response.data
-    client.get("/logout")  # Logout admin
-
-    # Test with Doctor
-    login_user(client, email="doctor@example.com")
-    response = client.get("/patients")
-    assert response.status_code == 200
-    assert b"John" in response.data
-    assert b"Doe" in response.data
-    client.get("/logout")  # Logout doctor
-
-    # Test with Patient (should be forbidden)
-    register_user(client, username="patientuser", email="patient@example.com", first_name="Pat", last_name="Ient")
-    login_user(client, email="patient@example.com")
-    response = client.get("/patients")
-    assert response.status_code == 403  # Forbidden
-    client.get("/logout")
+class TestIndexRoute(BaseTest):
+    def test_get_index_page_successfully(self, client):
+        """Tests that the index page loads successfully."""
+        response = client.get("/")
+        assert response.status_code == 200
+        assert b"MediArch" in response.data
 
 
-def test_add_patient(client):
-    # Test with Admin
-    login_user(client, email="admin@example.com")
-    response = client.post("/patients/add", data={
-        "first_name": "JaneAdmin",
-        "last_name": "SmithAdmin",
-        "birth_date": "1990-01-01"
-    }, follow_redirects=True)
-    assert response.status_code == 200
-    assert b"Patient added successfully" in response.data
-    assert b"JaneAdmin" in response.data
-    assert b"SmithAdmin" in response.data
-    # Verify in list
-    list_response = client.get("/patients")
-    assert b"JaneAdmin" in list_response.data
-    client.get("/logout")
+class TestPatientsListRoute(BaseTest):
+    def test_admin_can_view_patients_list(self, client):
+        """Tests that an admin can view the patients list."""
+        self.login_user(client, email="admin@example.com")
+        response = client.get("/patients")
+        assert response.status_code == 200
+        assert b"John" in response.data  # From fixture
+        assert b"Doe" in response.data
+        client.get("/logout")
 
-    # Test with Doctor
-    login_user(client, email="doctor@example.com")
-    response = client.post("/patients/add", data={
-        "first_name": "JaneDoctor",
-        "last_name": "SmithDoctor",
-        "birth_date": "1991-02-02"
-    }, follow_redirects=True)
-    assert response.status_code == 200
-    assert b"Patient added successfully" in response.data
-    assert b"JaneDoctor" in response.data
-    assert b"SmithDoctor" in response.data
-    list_response = client.get("/patients")
-    assert b"JaneDoctor" in list_response.data
-    client.get("/logout")
+    def test_doctor_can_view_patients_list(self, client):
+        """Tests that a doctor can view the patients list."""
+        self.login_user(client, email="doctor@example.com")
+        response = client.get("/patients")
+        assert response.status_code == 200
+        assert b"John" in response.data
+        assert b"Doe" in response.data
+        client.get("/logout")
 
-    # Test with Patient (should be forbidden)
-    register_user(client, username="patientadd", email="patientadd@example.com", first_name="PatAdd", last_name="Test")
-    login_user(client, email="patientadd@example.com")
-    response = client.post("/patients/add", data={
-        "first_name": "Try",
-        "last_name": "Adding",
-    }, follow_redirects=True)
-    assert response.status_code == 403  # Forbidden
-    client.get("/logout")
+    def test_patient_cannot_view_patients_list(self, client):
+        """Tests that a patient is forbidden from viewing the patients list."""
+        self.register_user(client, username="patientuser", email="patient@example.com",
+                           first_name="Pat", last_name="Ient")
+        self.login_user(client, email="patient@example.com")
+        response = client.get("/patients")
+        assert response.status_code == 403  # Forbidden
+        client.get("/logout")
 
 
-def test_view_patient(client):
-    # Test with Admin viewing fixture patient (id=1)
-    login_user(client, email="admin@example.com")
-    response = client.get("/patients/1")
-    assert response.status_code == 200
-    assert b"John" in response.data
-    assert b"Doe" in response.data
-    client.get("/logout")
+class TestAddPatientRoute(BaseTest):
+    def test_admin_can_add_patient(self, client):
+        """Tests that an admin can add a new patient."""
+        self.login_user(client, email="admin@example.com")
+        response = client.post("/patients/add", data={
+            "first_name": "JaneAdmin",
+            "last_name": "SmithAdmin",
+            "birth_date": "1990-01-01"
+        }, follow_redirects=True)
+        assert response.status_code == 200
+        assert b"Patient added successfully" in response.data
+        assert b"JaneAdmin" in response.data
+        assert b"SmithAdmin" in response.data
+        # Verify in list
+        list_response = client.get("/patients")
+        assert b"JaneAdmin" in list_response.data
+        client.get("/logout")
 
-    # Test with Doctor viewing fixture patient (id=1)
-    login_user(client, email="doctor@example.com")
-    response = client.get("/patients/1")
-    assert response.status_code == 200
-    assert b"John" in response.data
-    assert b"Doe" in response.data
-    client.get("/logout")
+    def test_doctor_can_add_patient(self, client):
+        """Tests that a doctor can add a new patient."""
+        self.login_user(client, email="doctor@example.com")
+        response = client.post("/patients/add", data={
+            "first_name": "JaneDoctor",
+            "last_name": "SmithDoctor",
+            "birth_date": "1991-02-02"
+        }, follow_redirects=True)
+        assert response.status_code == 200
+        assert b"Patient added successfully" in response.data
+        assert b"JaneDoctor" in response.data
+        assert b"SmithDoctor" in response.data
+        list_response = client.get("/patients")
+        assert b"JaneDoctor" in list_response.data
+        client.get("/logout")
 
-    # Test with Patient viewing their own card and another card
-    # Register a new patient user. Their patient card will be created.
-    register_response = register_user(client, username="patientview", email="patientview@example.com",
-                                      first_name="PatView", last_name="UserView")
-    assert b"Congratulations, you are now a registered user!" in register_response.data
-
-    login_user(client, email="patientview@example.com")
-
-    # Find the patient ID for this new user
-    # This is a bit indirect. A better way would be to query the DB or have register_user return it.
-    # For now, assume they are the latest user and patient card.
-    with client.application.app_context():
-        patient_user = User.query.filter_by(email="patientview@example.com").first()
-        assert patient_user is not None
-        assert patient_user.patient_id is not None
-        own_patient_id = patient_user.patient_id
-        # Ensure the patient card exists and has the correct name
-        own_patient_card = db.session.get(Patient, own_patient_id)
-        assert own_patient_card is not None
-        assert own_patient_card.first_name == "PatView"
-
-    # Patient views their own card
-    response_own = client.get(f"/patients/{own_patient_id}")
-    assert response_own.status_code == 200
-    assert b"PatView" in response_own.data
-    assert b"UserView" in response_own.data
-
-    # Patient tries to view another patient's card (id=1, John Doe from fixture)
-    response_other = client.get("/patients/1")
-    assert response_other.status_code == 403  # Forbidden
-    client.get("/logout")
+    def test_patient_cannot_add_patient(self, client):
+        """Tests that a patient is forbidden from adding a new patient."""
+        self.register_user(client, username="patientadd", email="patientadd@example.com",
+                           first_name="PatAdd", last_name="Test")
+        self.login_user(client, email="patientadd@example.com")
+        response = client.post("/patients/add", data={
+            "first_name": "Try",
+            "last_name": "Adding",
+        }, follow_redirects=True)
+        assert response.status_code == 403  # Forbidden
+        client.get("/logout")
 
 
-def test_edit_patient(client):
-    # Test with Admin editing fixture patient (id=1)
-    login_user(client, email="admin@example.com")
-    response_admin_edit = client.post("/patients/1/edit", data={
-        "first_name": "JohnAdminEdited",
-        "last_name": "DoeAdminEdited",
-        "birth_date": "1985-05-15"
-    }, follow_redirects=True)
-    assert response_admin_edit.status_code == 200
-    assert b"Patient updated successfully" in response_admin_edit.data
-    # Verify data in detail view
-    detail_response = client.get("/patients/1")
-    assert b"JohnAdminEdited" in detail_response.data
-    assert b"DoeAdminEdited" in detail_response.data
-    assert b"1985-05-15" in detail_response.data  # Assuming format is YYYY-MM-DD in detail view
-    client.get("/logout")
+class TestViewPatientRoute(BaseTest):
+    def test_admin_can_view_patient(self, client):
+        """Tests that an admin can view a patient's details."""
+        self.login_user(client, email="admin@example.com")
+        response = client.get("/patients/1")
+        assert response.status_code == 200
+        assert b"John" in response.data
+        assert b"Doe" in response.data
+        client.get("/logout")
 
-    # Test with Doctor editing fixture patient (id=1, previously edited by admin)
-    login_user(client, email="doctor@example.com")
-    response_doctor_edit = client.post("/patients/1/edit", data={
-        "first_name": "JohnDoctorEdited",
-        "last_name": "DoeDoctorEdited",
-        "birth_date": "1986-06-16"
-    }, follow_redirects=True)
-    assert response_doctor_edit.status_code == 200
-    assert b"Patient updated successfully" in response_doctor_edit.data
-    detail_response_doc = client.get("/patients/1")
-    assert b"JohnDoctorEdited" in detail_response_doc.data
-    assert b"DoeDoctorEdited" in detail_response_doc.data
-    assert b"1986-06-16" in detail_response_doc.data
-    client.get("/logout")
+    def test_doctor_can_view_patient(self, client):
+        """Tests that a doctor can view a patient's details."""
+        self.login_user(client, email="doctor@example.com")
+        response = client.get("/patients/1")
+        assert response.status_code == 200
+        assert b"John" in response.data
+        assert b"Doe" in response.data
+        client.get("/logout")
 
-    # Test with Patient editing their own card
-    register_user(client, username="patientedit", email="patientedit@example.com", first_name="PatEdit",
-                  last_name="UserEditInitial")
-    login_user(client, email="patientedit@example.com")
+    def test_patient_can_view_own_card(self, client):
+        """Tests that a patient can view their own patient card."""
+        # Register a new patient user. Their patient card will be created.
+        register_response = self.register_user(client, username="patientview", email="patientview@example.com",
+                                            first_name="PatView", last_name="UserView")
+        assert b"Congratulations, you are now a registered user!" in register_response.data
 
-    with client.application.app_context():
-        patient_user = User.query.filter_by(email="patientedit@example.com").first()
-        own_patient_id = patient_user.patient_id
-        original_patient_card = db.session.get(Patient, own_patient_id)
-        original_birth_date_str = original_patient_card.birth_date.strftime("%Y-%m-%d") \
-                                  if original_patient_card.birth_date else ""
+        self.login_user(client, email="patientview@example.com")
 
-    # Patient edits own basic info (first, last name) and attempts to change birth_date
-    response_patient_own_edit = client.post(f"/patients/{own_patient_id}/edit", data={
-        "first_name": "PatEdited",
-        "last_name": "UserEditedFinal",
-        "birth_date": "2000-01-01"  # Attempt to change birth date
-    }, follow_redirects=True)
-    assert response_patient_own_edit.status_code == 200
-    assert b"Patient updated successfully" in response_patient_own_edit.data
-    # Check if warning about birth date change was flashed (optional, depends on exact flash message)
-    assert b"Patients are not allowed to change their birth date" in response_patient_own_edit.data
+        # Find the patient ID for this new user
+        with client.application.app_context():
+            patient_user = User.query.filter_by(email="patientview@example.com").first()
+            assert patient_user is not None
+            assert patient_user.patient_id is not None
+            own_patient_id = patient_user.patient_id
+            # Ensure the patient card exists and has the correct name
+            own_patient_card = db.session.get(Patient, own_patient_id)
+            assert own_patient_card is not None
+            assert own_patient_card.first_name == "PatView"
 
-    detail_response_patient = client.get(f"/patients/{own_patient_id}")
-    assert b"PatEdited" in detail_response_patient.data
-    assert b"UserEditedFinal" in detail_response_patient.data
-    # Verify birth_date was NOT changed
-    if original_birth_date_str:
-        assert original_birth_date_str.encode() in detail_response_patient.data
-    else:  # If original birth date was None, it should remain effectively None or empty in display
-        # This check depends on how None birth_date is rendered. Assuming it's not "2000-01-01"
-        assert b"2000-01-01" not in detail_response_patient.data
+        # Patient views their own card
+        response_own = client.get(f"/patients/{own_patient_id}")
+        assert response_own.status_code == 200
+        assert b"PatView" in response_own.data
+        assert b"UserView" in response_own.data
+        client.get("/logout")
 
-    # Patient tries to edit another patient's card (id=1)
-    response_patient_other_edit = client.post("/patients/1/edit", data={
-        "first_name": "AttemptHack",
-        "last_name": "AttemptHack"
-    }, follow_redirects=True)
-    assert response_patient_other_edit.status_code == 403  # Forbidden
-    client.get("/logout")
+    def test_patient_cannot_view_another_card(self, client):
+        """Tests that a patient cannot view another patient's card."""
+        # Register a patient and login
+        self.register_user(client, username="patientview2", email="patientview2@example.com",
+                          first_name="PatView2", last_name="UserView2")
+        self.login_user(client, email="patientview2@example.com")
+
+        # Patient tries to view another patient's card (id=1, John Doe from fixture)
+        response_other = client.get("/patients/1")
+        assert response_other.status_code == 403  # Forbidden
+        client.get("/logout")
 
 
-def test_delete_patient(client):
-    # Add a patient specifically for deletion by Admin
-    login_user(client, email="admin@example.com")
-    add_response = client.post("/patients/add", data={
-        "first_name": "ToDelete",
-        "last_name": "ByAdmin",
-        "birth_date": "2000-01-01"
-    }, follow_redirects=True)
-    assert add_response.status_code == 200
-    assert b"Patient added successfully" in add_response.data
+class TestEditPatientRoute(BaseTest):
+    def test_admin_can_edit_patient(self, client):
+        """Tests that an admin can edit a patient's details."""
+        self.login_user(client, email="admin@example.com")
+        response_admin_edit = client.post("/patients/1/edit", data={
+            "first_name": "JohnAdminEdited",
+            "last_name": "DoeAdminEdited",
+            "birth_date": "1985-05-15"
+        }, follow_redirects=True)
+        assert response_admin_edit.status_code == 200
+        assert b"Patient updated successfully" in response_admin_edit.data
+        # Verify data in detail view
+        detail_response = client.get("/patients/1")
+        assert b"JohnAdminEdited" in detail_response.data
+        assert b"DoeAdminEdited" in detail_response.data
+        assert b"1985-05-15" in detail_response.data  # Assuming format is YYYY-MM-DD in detail view
+        client.get("/logout")
 
-    # Find the ID of the newly added patient "ToDelete ByAdmin"
-    # This requires inspecting the database state or parsing HTML, which can be brittle.
-    # A more robust way is to query the DB directly within app_context.
-    patient_to_delete_id = None
-    with client.application.app_context():
-        # Assuming last names are unique enough for this test scenario
-        # Or find by combination of first/last name
-        added_patient = Patient.query.filter_by(first_name="ToDelete", last_name="ByAdmin").first()
-        assert added_patient is not None, "Patient 'ToDelete ByAdmin' was not found after adding."
-        patient_to_delete_id = added_patient.id
+    def test_doctor_can_edit_patient(self, client):
+        """Tests that a doctor can edit a patient's details."""
+        self.login_user(client, email="doctor@example.com")
+        response_doctor_edit = client.post("/patients/1/edit", data={
+            "first_name": "JohnDoctorEdited",
+            "last_name": "DoeDoctorEdited",
+            "birth_date": "1986-06-16"
+        }, follow_redirects=True)
+        assert response_doctor_edit.status_code == 200
+        assert b"Patient updated successfully" in response_doctor_edit.data
+        detail_response_doc = client.get("/patients/1")
+        assert b"JohnDoctorEdited" in detail_response_doc.data
+        assert b"DoeDoctorEdited" in detail_response_doc.data
+        assert b"1986-06-16" in detail_response_doc.data
+        client.get("/logout")
 
-    assert patient_to_delete_id is not None, "Could not retrieve ID for patient 'ToDelete ByAdmin'"
+    def test_patient_can_edit_own_card(self, client):
+        """Tests that a patient can edit their own basic information."""
+        self.register_user(client, username="patientedit", email="patientedit@example.com", first_name="PatEdit",
+                          last_name="UserEditInitial")
+        self.login_user(client, email="patientedit@example.com")
 
-    # Admin deletes the patient they just added
-    delete_response_admin = client.get(f"/patients/{patient_to_delete_id}/delete", follow_redirects=True)
-    assert delete_response_admin.status_code == 200
-    assert b"Patient deleted successfully" in delete_response_admin.data
-    # Verify the patient is no longer in the list or accessible
-    list_response_admin = client.get("/patients")
-    assert b"ToDelete" not in list_response_admin.data
-    assert b"ByAdmin" not in list_response_admin.data
-    detail_response_admin = client.get(f"/patients/{patient_to_delete_id}")
-    assert detail_response_admin.status_code == 404  # Should be Not Found after deletion
-    client.get("/logout")  # Logout Admin
+        with client.application.app_context():
+            patient_user = User.query.filter_by(email="patientedit@example.com").first()
+            own_patient_id = patient_user.patient_id
+            original_patient_card = db.session.get(Patient, own_patient_id)
+            original_birth_date_str = original_patient_card.birth_date.strftime("%Y-%m-%d") \
+                                    if original_patient_card.birth_date else ""
 
-    # Doctor tries to delete fixture patient (id=1) - should be forbidden
-    login_user(client, email="doctor@example.com")
-    delete_response_doctor = client.get("/patients/1/delete", follow_redirects=True)
-    assert delete_response_doctor.status_code == 403  # Forbidden
-    # Verify patient 1 still exists
-    detail_response_doc_check = client.get("/patients/1")
-    assert detail_response_doc_check.status_code == 200
-    # Patient 1 should have its original fixture name "John Doe",
-    # as database state is reset for each test function.
-    assert b"John Doe" in detail_response_doc_check.data
-    client.get("/logout")  # Logout Doctor
+        # Patient edits own basic info (first, last name) and attempts to change birth_date
+        response_patient_own_edit = client.post(f"/patients/{own_patient_id}/edit", data={
+            "first_name": "PatEdited",
+            "last_name": "UserEditedFinal",
+            "birth_date": "2000-01-01"  # Attempt to change birth date
+        }, follow_redirects=True)
+        assert response_patient_own_edit.status_code == 200
+        assert b"Patient updated successfully" in response_patient_own_edit.data
+        # Check if warning about birth date change was flashed (optional, depends on exact flash message)
+        assert b"Patients are not allowed to change their birth date" in response_patient_own_edit.data
 
-    # Patient tries to delete fixture patient (id=1) - should be forbidden
-    register_user(client, username="patientdelete", email="patientdelete@example.com",
-                  first_name="PatDel", last_name="UserDel")
-    login_user(client, email="patientdelete@example.com")
-    delete_response_patient = client.get("/patients/1/delete", follow_redirects=True)
-    assert delete_response_patient.status_code == 403  # Forbidden
-    # Verify patient 1 still exists
-    # Need to login as admin/doctor to check patient 1 again, or ensure patient login doesn't affect it.
-    # For simplicity, assume patient 1 still exists and check after logging out patient and logging in admin.
-    client.get("/logout")
-    login_user(client, email="admin@example.com")
-    detail_response_admin_check = client.get("/patients/1")
-    assert detail_response_admin_check.status_code == 200
-    client.get("/logout")
+        detail_response_patient = client.get(f"/patients/{own_patient_id}")
+        assert b"PatEdited" in detail_response_patient.data
+        assert b"UserEditedFinal" in detail_response_patient.data
+        # Verify birth_date was NOT changed
+        if original_birth_date_str:
+            assert original_birth_date_str.encode() in detail_response_patient.data
+        else:  # If original birth date was None, it should remain effectively None or empty in display
+            # This check depends on how None birth_date is rendered. Assuming it's not "2000-01-01"
+            assert b"2000-01-01" not in detail_response_patient.data
+        client.get("/logout")
 
+    def test_patient_cannot_edit_another_card(self, client):
+        """Tests that a patient cannot edit another patient's card."""
+        self.register_user(client, username="patientedit2", email="patientedit2@example.com",
+                     first_name="PatEdit2", last_name="UserEdit2")
+        self.login_user(client, email="patientedit2@example.com")
 
-def test_admin_toggle_user_active(client, app):
-    # Scenario: Admin toggles another user's active status
-    # Register a new user (e.g., a doctor) by admin, who will be initially inactive
-    with app.app_context():
-        doctor_for_toggle = User(username="toggledoctor", email="toggle@doctor.com",
-                                 account_type=AccountType.DOCTOR, is_active=False)
-        doctor_for_toggle.set_password("password123")
-        db.session.add(doctor_for_toggle)
-        db.session.commit()
-        user_to_toggle_id = doctor_for_toggle.id
-
-    login_user(client, email="admin@example.com", password="password123")
-
-    # Check initial state (inactive)
-    with app.app_context():
-        user_toggled = db.session.get(User, user_to_toggle_id)
-        assert user_toggled is not None
-        assert not user_toggled.is_active
-
-    # Toggle to active
-    response_activate = client.post(f"/admin/users/{user_to_toggle_id}/toggle_active", follow_redirects=True)
-    assert response_activate.status_code == 200
-    assert b"User toggledoctor has been activated." in response_activate.data
-    with app.app_context():
-        user_toggled = db.session.get(User, user_to_toggle_id)
-        assert user_toggled.is_active
-
-    # Toggle back to inactive
-    response_deactivate = client.post(f"/admin/users/{user_to_toggle_id}/toggle_active", follow_redirects=True)
-    assert response_deactivate.status_code == 200
-    assert b"User toggledoctor has been deactivated." in response_deactivate.data
-    with app.app_context():
-        user_toggled = db.session.get(User, user_to_toggle_id)
-        assert not user_toggled.is_active
-
-    # Scenario: Admin attempts to toggle a non-existent user
-    login_user(client, email="admin@example.com", password="password123")
-    non_existent_user_id = 99999
-    response_toggle_non_existent = client.post(f"/admin/users/{non_existent_user_id}/toggle_active",
-                                               follow_redirects=True)
-    assert response_toggle_non_existent.status_code == 200  # Redirects to user list
-    assert b"User with ID 99999 not found." in response_toggle_non_existent.data
-    client.get("/logout")
+        # Patient tries to edit another patient's card (id=1)
+        response_patient_other_edit = client.post("/patients/1/edit", data={
+            "first_name": "AttemptHack",
+            "last_name": "AttemptHack"
+        }, follow_redirects=True)
+        assert response_patient_other_edit.status_code == 403  # Forbidden
+        client.get("/logout")
 
 
-def test_admin_dashboard(client):
-    # Test with Admin
-    login_user(client, email="admin@example.com", password="password123")
-    response = client.get("/admin")
-    assert response.status_code == 200
-    assert b"Admin Dashboard" in response.data  # Assuming "Admin Dashboard" is in the template
-    client.get("/logout")
+class TestDeletePatientRoute(BaseTest):
+    def test_admin_can_delete_patient(self, client):
+        """Tests that an admin can delete a patient."""
+        self.login_user(client, email="admin@example.com")
 
-    # Test with Doctor (should be forbidden)
-    login_user(client, email="doctor@example.com", password="password123")
-    response = client.get("/admin")
-    assert response.status_code == 403
-    client.get("/logout")
+        # Add a patient specifically for deletion
+        add_response = client.post("/patients/add", data={
+            "first_name": "ToDelete",
+            "last_name": "ByAdmin",
+            "birth_date": "2000-01-01"
+        }, follow_redirects=True)
+        assert add_response.status_code == 200
+        assert b"Patient added successfully" in add_response.data
 
-    # Test with Patient (should be forbidden)
-    register_user(client, username="patientdash", email="patientdash@example.com",
-                  account_type_value=AccountType.PATIENT.value)
-    login_user(client, email="patientdash@example.com", password="password123")
-    response = client.get("/admin")
-    assert response.status_code == 403
-    client.get("/logout")
+        # Find the ID of the newly added patient "ToDelete ByAdmin"
+        patient_to_delete_id = None
+        with client.application.app_context():
+            # Assuming last names are unique enough for this test scenario
+            added_patient = Patient.query.filter_by(first_name="ToDelete", last_name="ByAdmin").first()
+            assert added_patient is not None, "Patient 'ToDelete ByAdmin' was not found after adding."
+            patient_to_delete_id = added_patient.id
 
-    # Test unauthenticated access
-    response = client.get("/admin")
-    assert response.status_code == 302  # Redirects to login
-    assert b"Redirecting..." in response.data
+        assert patient_to_delete_id is not None, "Could not retrieve ID for patient 'ToDelete ByAdmin'"
+
+        # Admin deletes the patient they just added
+        delete_response_admin = client.get(f"/patients/{patient_to_delete_id}/delete", follow_redirects=True)
+        assert delete_response_admin.status_code == 200
+        assert b"Patient deleted successfully" in delete_response_admin.data
+
+        # Verify the patient is no longer in the list or accessible
+        list_response_admin = client.get("/patients")
+        assert b"ToDelete" not in list_response_admin.data
+        assert b"ByAdmin" not in list_response_admin.data
+
+        detail_response_admin = client.get(f"/patients/{patient_to_delete_id}")
+        assert detail_response_admin.status_code == 404  # Should be Not Found after deletion
+        client.get("/logout")
+
+    def test_doctor_cannot_delete_patient(self, client):
+        """Tests that a doctor cannot delete a patient."""
+        self.login_user(client, email="doctor@example.com")
+        delete_response_doctor = client.get("/patients/1/delete", follow_redirects=True)
+        assert delete_response_doctor.status_code == 403  # Forbidden
+
+        # Verify patient 1 still exists
+        detail_response_doc_check = client.get("/patients/1")
+        assert detail_response_doc_check.status_code == 200
+        assert b"John" in detail_response_doc_check.data
+        assert b"Doe" in detail_response_doc_check.data
+        client.get("/logout")
+
+    def test_patient_cannot_delete_patient(self, client):
+        """Tests that a patient cannot delete a patient record."""
+        self.register_user(client, username="patientdelete", email="patientdelete@example.com",
+                     first_name="PatDel", last_name="UserDel")
+        self.login_user(client, email="patientdelete@example.com")
+
+        delete_response_patient = client.get("/patients/1/delete", follow_redirects=True)
+        assert delete_response_patient.status_code == 403  # Forbidden
+        client.get("/logout")
+
+        # Verify patient 1 still exists (need to login as admin to check)
+        self.login_user(client, email="admin@example.com")
+        detail_response_admin_check = client.get("/patients/1")
+        assert detail_response_admin_check.status_code == 200
+        client.get("/logout")
 
 
-def test_admin_list_users(client):
-    # Test with Admin
-    login_user(client, email="admin@example.com", password="password123")
-    response = client.get("/admin/users")
-    assert response.status_code == 200
-    assert b"admin@example.com" in response.data  # Admin user from fixture
-    assert b"doctor@example.com" in response.data  # Doctor user from fixture
-    client.get("/logout")
+class TestAdminToggleUserActiveRoute(BaseTest):
+    def test_admin_can_activate_user(self, client, app):
+        """Tests that an admin can activate an inactive user."""
+        # Create an inactive doctor user
+        with app.app_context():
+            doctor_for_toggle = User(username="toggledoctor", email="toggle@doctor.com",
+                                    account_type=AccountType.DOCTOR, is_active=False)
+            doctor_for_toggle.set_password("password123")
+            db.session.add(doctor_for_toggle)
+            db.session.commit()
+            user_to_toggle_id = doctor_for_toggle.id
 
-    # Test with Doctor (should be forbidden)
-    login_user(client, email="doctor@example.com", password="password123")
-    response = client.get("/admin/users")
-    assert response.status_code == 403
-    client.get("/logout")
+        self.login_user(client, email="admin@example.com", password="password123")
 
-    # Test with Patient (should be forbidden)
-    register_user(client, username="patientlist", email="patientlist@example.com",
-                  account_type_value=AccountType.PATIENT.value)
-    login_user(client, email="patientlist@example.com", password="password123")
-    response = client.get("/admin/users")
-    assert response.status_code == 403
-    client.get("/logout")
+        # Check initial state (inactive)
+        with app.app_context():
+            user_toggled = db.session.get(User, user_to_toggle_id)
+            assert user_toggled is not None
+            assert not user_toggled.is_active
 
-    # Test unauthenticated access
-    response = client.get("/admin/users")
-    assert response.status_code == 302  # Redirects to login
-    assert b"Redirecting..." in response.data
+        # Toggle to active
+        response_activate = client.post(f"/admin/users/{user_to_toggle_id}/toggle_active", follow_redirects=True)
+        assert response_activate.status_code == 200
+        assert b"User toggledoctor has been activated." in response_activate.data
 
-def test_authenticated_user_redirect_from_login(client):
-    """Test that an authenticated user is redirected from the login page."""
-    # Log in an admin user (or any user)
-    login_user(client, email="admin@example.com", password="password123")
+        with app.app_context():
+            user_toggled = db.session.get(User, user_to_toggle_id)
+            assert user_toggled.is_active
 
-    # Attempt to access the login page
-    response = client.get("/login", follow_redirects=False) # follow_redirects=False to check 302
-    assert response.status_code == 302
-    assert response.location == "/" # Should redirect to index
+        client.get("/logout")
 
-    response_followed = client.get("/login", follow_redirects=True)
-    assert response_followed.status_code == 200
-    assert b"MediArch" in response_followed.data # Index page content
-    assert b"Login" not in response_followed.data # Should not be on login page
-    client.get("/logout")
+    def test_admin_can_deactivate_user(self, client, app):
+        """Tests that an admin can deactivate an active user."""
+        # Create an active doctor user
+        with app.app_context():
+            doctor_for_toggle = User(username="toggledoctor2", email="toggle2@doctor.com",
+                                    account_type=AccountType.DOCTOR, is_active=True)
+            doctor_for_toggle.set_password("password123")
+            db.session.add(doctor_for_toggle)
+            db.session.commit()
+            user_to_toggle_id = doctor_for_toggle.id
+
+        self.login_user(client, email="admin@example.com", password="password123")
+
+        # Toggle to inactive
+        response_deactivate = client.post(f"/admin/users/{user_to_toggle_id}/toggle_active", follow_redirects=True)
+        assert response_deactivate.status_code == 200
+        assert b"User toggledoctor2 has been deactivated." in response_deactivate.data
+
+        with app.app_context():
+            user_toggled = db.session.get(User, user_to_toggle_id)
+            assert not user_toggled.is_active
+
+        client.get("/logout")
+
+    def test_admin_cannot_toggle_nonexistent_user(self, client):
+        """Tests that an error is shown when trying to toggle a non-existent user."""
+        self.login_user(client, email="admin@example.com", password="password123")
+
+        non_existent_user_id = 99999
+        response_toggle_non_existent = client.post(f"/admin/users/{non_existent_user_id}/toggle_active",
+                                                follow_redirects=True)
+        assert response_toggle_non_existent.status_code == 200  # Redirects to user list
+        assert b"User with ID 99999 not found." in response_toggle_non_existent.data
+
+        client.get("/logout")
+
+
+class TestAdminDashboardRoute(BaseTest):
+    def test_admin_can_access_dashboard(self, client):
+        """Tests that an admin can access the admin dashboard."""
+        self.login_user(client, email="admin@example.com", password="password123")
+        response = client.get("/admin")
+        assert response.status_code == 200
+        assert b"Admin Dashboard" in response.data
+        client.get("/logout")
+
+    def test_doctor_cannot_access_dashboard(self, client):
+        """Tests that a doctor cannot access the admin dashboard."""
+        self.login_user(client, email="doctor@example.com", password="password123")
+        response = client.get("/admin")
+        assert response.status_code == 403
+        client.get("/logout")
+
+    def test_patient_cannot_access_dashboard(self, client):
+        """Tests that a patient cannot access the admin dashboard."""
+        self.register_user(client, username="patientdash", email="patientdash@example.com",
+                    account_type_value=AccountType.PATIENT.value)
+        self.login_user(client, email="patientdash@example.com", password="password123")
+        response = client.get("/admin")
+        assert response.status_code == 403
+        client.get("/logout")
+
+    def test_unauthenticated_user_redirected_from_dashboard(self, client):
+        """Tests that an unauthenticated user is redirected from the admin dashboard."""
+        response = client.get("/admin")
+        assert response.status_code == 302  # Redirects to login
+        assert b"Redirecting..." in response.data
+
+
+class TestAdminListUsersRoute(BaseTest):
+    def test_admin_can_list_users(self, client):
+        """Tests that an admin can list all users."""
+        self.login_user(client, email="admin@example.com", password="password123")
+        response = client.get("/admin/users")
+        assert response.status_code == 200
+        assert b"admin@example.com" in response.data
+        assert b"doctor@example.com" in response.data
+        client.get("/logout")
+
+    def test_doctor_cannot_list_users(self, client):
+        """Tests that a doctor cannot list users."""
+        self.login_user(client, email="doctor@example.com", password="password123")
+        response = client.get("/admin/users")
+        assert response.status_code == 403
+        client.get("/logout")
+
+    def test_patient_cannot_list_users(self, client):
+        """Tests that a patient cannot list users."""
+        self.register_user(client, username="patientlist", email="patientlist@example.com",
+                    account_type_value=AccountType.PATIENT.value)
+        self.login_user(client, email="patientlist@example.com", password="password123")
+        response = client.get("/admin/users")
+        assert response.status_code == 403
+        client.get("/logout")
+
+    def test_unauthenticated_user_redirected_from_list_users(self, client):
+        """Tests that an unauthenticated user is redirected from the user list page."""
+        response = client.get("/admin/users")
+        assert response.status_code == 302  # Redirects to login
+        assert b"Redirecting..." in response.data
+
+
+class TestLoginRedirectRoute(BaseTest):
+    def test_authenticated_user_redirected_from_login(self, client):
+        """Tests that an authenticated user is redirected from the login page."""
+        # Log in an admin user
+        self.login_user(client, email="admin@example.com", password="password123")
+
+        # Attempt to access the login page
+        response = client.get("/login", follow_redirects=False)
+        assert response.status_code == 302
+        assert response.location == "/"  # Should redirect to index
+
+        response_followed = client.get("/login", follow_redirects=True)
+        assert response_followed.status_code == 200
+        assert b"MediArch" in response_followed.data  # Index page content
+        assert b"Login" not in response_followed.data  # Should not be on login page
+        client.get("/logout")

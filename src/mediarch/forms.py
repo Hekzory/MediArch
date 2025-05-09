@@ -34,13 +34,13 @@ class RegistrationForm(FlaskForm):
     )
     submit = SubmitField("Register")
 
-    def validate_username(self, username: StringField) -> None:  # noqa: PLR6301
+    def validate_username(self, username: StringField) -> None:
         """Validate that the username is not already taken."""
         user = User.query.filter_by(username=username.data).first()
         if user:
             raise ValidationError("That username is already taken. Please choose a different one.")
 
-    def validate_email(self, email: StringField) -> None:  # noqa: PLR6301
+    def validate_email(self, email: StringField) -> None:
         """Validate that the email is not already taken."""
         user = User.query.filter_by(email=email.data).first()
         if user:
