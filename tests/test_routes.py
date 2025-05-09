@@ -505,6 +505,182 @@ class TestAdminListUsersRoute(BaseTest):
         assert b"Redirecting..." in response.data
 
 
+class TestAdminEditUserRoute(BaseTest):
+    def test_admin_can_edit_user_details(self, client, app):
+        """Tests that an admin can successfully edit a user's details."""
+        # Create a user to be edited
+        with app.app_context():
+            user_to_edit = User(username="editme", email="editme@example.com",
+                                account_type=AccountType.PATIENT, is_active=False)
+            user_to_edit.set_password("password123")
+            db.session.add(user_to_edit)
+            db.session.commit()
+            user_id = user_to_edit.id
+
+        self.login_user(client, email="admin@example.com", password="password123")
+
+        edit_data = {
+            "username": "editeduser",
+            "email": "edited@example.com",
+            "account_type": AccountType.DOCTOR.value,
+            "is_active": "true"  # Form value for True
+        }
+        response = client.post(f"/admin/users/{user_id}/edit", data=edit_data, follow_redirects=True)
+
+        assert response.status_code == 200
+        assert b"User updated successfully." in response.data
+
+        # Verify changes in the database
+        with app.app_context():
+            edited_user = db.session.get(User, user_id)
+            assert edited_user is not None
+            assert edited_user.username == "editeduser"
+            assert edited_user.email == "edited@example.com"
+            assert edited_user.account_type == AccountType.DOCTOR
+            assert edited_user.is_active is True
+
+        client.get("/logout")
+
+    def test_admin_can_change_user_password(self, client, app):
+        """Tests that an admin can change a user's password."""
+        with app.app_context():
+            user_to_edit = User(username="passchangeuser", email="passchange@example.com",
+                                account_type=AccountType.PATIENT, is_active=True)
+            user_to_edit.set_password("oldpassword")
+            db.session.add(user_to_edit)
+            db.session.commit()
+            user_id = user_to_edit.id
+
+        self.login_user(client, email="admin@example.com", password="password123")
+
+        edit_data = {
+            "username": "passchangeuser",  # Must provide other fields too
+            "email": "passchange@example.com",
+            "account_type": AccountType.PATIENT.value,
+            "is_active": "true",
+            "password": "newstrongpassword"
+        }
+        response = client.post(f"/admin/users/{user_id}/edit", data=edit_data, follow_redirects=True)
+
+        assert response.status_code == 200
+        assert b"User updated successfully." in response.data
+        assert b"Password updated." in response.data
+
+        # Verify password change by trying to log in with the new password
+        with app.app_context():
+            updated_user = db.session.get(User, user_id)
+            assert updated_user.check_password("newstrongpassword") is True
+            assert updated_user.check_password("oldpassword") is False
+
+        client.get("/logout")
+
+    def test_admin_cannot_edit_nonexistent_user(self, client):
+        """Tests that an admin sees an error when trying to edit a non-existent user."""
+        self.login_user(client, email="admin@example.com", password="password123")
+
+        non_existent_user_id = 99999
+        edit_data = {
+            "username": "ghost",
+            "email": "ghost@example.com",
+            "account_type": AccountType.PATIENT.value,
+            "is_active": "true"
+        }
+        response = client.post(f"/admin/users/{non_existent_user_id}/edit", data=edit_data, follow_redirects=True)
+
+        assert response.status_code == 200  # Should redirect to admin_list_users
+        assert b"User with ID 99999 not found." in response.data
+
+        client.get("/logout")
+
+    def test_doctor_cannot_access_admin_edit_user_page(self, client, app):
+        """Tests that a doctor cannot access the admin edit user page (GET or POST)."""
+        with app.app_context():
+            # Create a user that could be edited if permissions allowed
+            test_user = User(username="testedit", email="testedit@example.com",
+                             account_type=AccountType.PATIENT, is_active=True)
+            test_user.set_password("password123")
+            db.session.add(test_user)
+            db.session.commit()
+            user_id_to_try_edit = test_user.id
+
+        # Login as Doctor
+        self.login_user(client, email="doctor@example.com", password="password123")
+
+        # Attempt GET request
+        response_get = client.get(f"/admin/users/{user_id_to_try_edit}/edit")
+        assert response_get.status_code == 403  # Forbidden
+
+        # Attempt POST request
+        edit_data = {
+            "username": "hacked",
+            "email": "hacked@example.com",
+            "account_type": AccountType.PATIENT.value,
+            "is_active": "true"
+        }
+        response_post = client.post(f"/admin/users/{user_id_to_try_edit}/edit", data=edit_data, follow_redirects=True)
+        assert response_post.status_code == 403  # Forbidden
+
+        client.get("/logout")
+
+    def test_patient_cannot_access_admin_edit_user_page(self, client, app):
+        """Tests that a patient cannot access the admin edit user page (GET or POST)."""
+        with app.app_context():
+            # Create a user that could be edited if permissions allowed
+            user_id_to_try_edit = User.query.filter_by(username="admin").first().id  # Try to edit admin
+
+        # Register and Login as Patient
+        self.register_user(client, username="patientaccess", email="patientaccess@example.com",
+                           first_name="Pat", last_name="Acc")
+        self.login_user(client, email="patientaccess@example.com", password="password123")
+
+        # Attempt GET request
+        response_get = client.get(f"/admin/users/{user_id_to_try_edit}/edit")
+        assert response_get.status_code == 403  # Forbidden
+
+        # Attempt POST request
+        edit_data = {
+            "username": "hackedpatient",
+            "email": "hackedpatient@example.com",
+            "account_type": AccountType.ADMIN.value,
+            "is_active": "true"
+        }
+        response_post = client.post(f"/admin/users/{user_id_to_try_edit}/edit", data=edit_data, follow_redirects=True)
+        assert response_post.status_code == 403  # Forbidden
+
+        client.get("/logout")
+
+    def test_admin_edit_user_with_invalid_account_type(self, client, app):
+        """Tests submitting an invalid account type when admin edits a user."""
+        with app.app_context():
+            user_to_edit = User(username="invalidtypeuser", email="invalidtype@example.com",
+                                account_type=AccountType.PATIENT, is_active=True)
+            user_to_edit.set_password("password123")
+            db.session.add(user_to_edit)
+            db.session.commit()
+            user_id = user_to_edit.id
+
+        self.login_user(client, email="admin@example.com", password="password123")
+
+        edit_data = {
+            "username": "invalidtypeuser",
+            "email": "invalidtype@example.com",
+            "account_type": "INVALID_TYPE_STRING",
+            "is_active": "true"
+        }
+        response = client.post(f"/admin/users/{user_id}/edit", data=edit_data, follow_redirects=True)
+
+        assert response.status_code == 200  # Stays on the form page
+        assert b"Invalid account type selected." in response.data
+        assert b"User updated successfully." not in response.data
+
+        # Verify account type was not changed
+        with app.app_context():
+            user_after_attempt = db.session.get(User, user_id)
+            assert user_after_attempt.account_type == AccountType.PATIENT
+
+        client.get("/logout")
+
+
 class TestLoginRedirectRoute(BaseTest):
     def test_authenticated_user_redirected_from_login(self, client):
         """Tests that an authenticated user is redirected from the login page."""
