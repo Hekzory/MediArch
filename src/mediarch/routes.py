@@ -259,12 +259,8 @@ def view_patient(patient_id: int) -> str:
     if current_user.account_type in {AccountType.ADMIN, AccountType.DOCTOR}:
         # Admins and Doctors can view any patient
         pass
-    elif current_user.account_type == AccountType.PATIENT:
+    elif current_user.patient_id != patient.id:
         # Patients can only view their own card
-        if current_user.patient_id != patient.id:
-            abort(403)  # Forbidden
-    else:
-        # Should not happen if roles are correctly assigned
         abort(403)  # Forbidden
 
     return render_template("patient_detail.html", patient=patient)
@@ -287,13 +283,10 @@ def edit_patient(patient_id: int) -> str:
 
     if current_user.account_type in {AccountType.ADMIN, AccountType.DOCTOR}:
         can_edit_all_fields = True
-    elif current_user.account_type == AccountType.PATIENT:
-        if current_user.patient_id == patient.id:
-            is_own_record_for_patient_user = True
-        else:
-            abort(403)  # Patient trying to edit another patient's record
+    elif current_user.patient_id == patient.id:
+        is_own_record_for_patient_user = True
     else:
-        abort(403)  # Unknown role or other issue
+        abort(403)  # Patient trying to edit another patient's record
 
     if request.method == "POST":
         # Get common fields first
@@ -323,9 +316,6 @@ def edit_patient(patient_id: int) -> str:
             if request.form.get("birth_date") != (patient.birth_date.strftime("%Y-%m-%d")
                                                   if patient.birth_date else ""):
                 flash("Patients are not allowed to change their birth date. Contact an administrator.", "warning")
-        else:
-            # This case should have been caught by abort(403) earlier, but as a safeguard:
-            abort(403)
 
         db.session.commit()
         flash("Patient updated successfully.", "success")

@@ -58,15 +58,10 @@ class BaseTest:
             "email": email,
             "password": password,
             "confirm_password": password,
-            "account_type": account_type_value
+            "account_type": account_type_value,
+            "first_name": first_name,
+            "last_name": last_name
         }
-        # Add first_name and last_name only if registering a patient
-        if account_type_value == AccountType.PATIENT.value:
-            if first_name:  # Ensure not to send empty strings if None was intended, though form expects them.
-                data["first_name"] = first_name
-            if last_name:
-                data["last_name"] = last_name
-
         return client.post("/register", data=data, follow_redirects=True)
 
     def login_user(self, client, email="test@example.com", password="password123"):
@@ -412,6 +407,16 @@ class TestDeletePatientRoute(BaseTest):
         assert detail_response_admin_check.status_code == 200
         client.get("/logout")
 
+    def test_delete_non_existent_patient(self, client):
+        """Tests attempting to delete a non-existent patient."""
+        self.login_user(client, email="admin@example.com")  # Admin or Doctor can attempt delete
+        non_existent_patient_id = 99999
+
+        # Test GET request
+        response_get = client.get(f"/patients/{non_existent_patient_id}/delete")
+        assert response_get.status_code == 404
+        client.get("/logout")
+
 
 class TestAdminToggleUserActiveRoute(BaseTest):
     def test_admin_can_activate_user(self, client, app):
@@ -722,7 +727,7 @@ class TestAdminEditUserRoute(BaseTest):
         client.get("/logout")
 
 
-class TestLoginRedirectRoute(BaseTest):
+class TestLoginRoute(BaseTest):
     def test_authenticated_user_redirected_from_login(self, client):
         """Tests that an authenticated user is redirected from the login page."""
         # Log in an admin user
@@ -739,8 +744,34 @@ class TestLoginRedirectRoute(BaseTest):
         assert b"Login" not in response_followed.data  # Should not be on login page
         client.get("/logout")
 
+    def test_login_inactive_admin_shows_pending_activation_flash(self, client, app):
+        """Tests flash message when an inactive admin (pending activation) logs in."""
+        # Register a new admin user (will be inactive by default as per registration logic)
+        self.register_user(
+            client,
+            username="inactiveadmin",
+            email="inactiveadmin@example.com",
+            password="password123",
+            account_type_value=AccountType.ADMIN.value,
+            first_name="Inactive",
+            last_name="Admin"
+        )
+        # Ensure user is indeed inactive
+        with app.app_context():
+            user = User.query.filter_by(email="inactiveadmin@example.com").first()
+            assert user is not None
+            assert not user.is_active
+            assert not user.is_globally_active  # Check the property used in routes.py
 
-class TestRegisterRedirectRoute(BaseTest):
+        # Attempt to login with the inactive admin
+        response = self.login_user(client, email="inactiveadmin@example.com", password="password123")
+        assert response.status_code == 200  # Successful login, but shows flash
+        assert b"Login successful, but your account is pending activation by an administrator." in response.data
+        assert b"MediArch" in response.data  # Should be redirected to index
+        client.get("/logout")
+
+
+class TestRegisterRoute(BaseTest):
     def test_authenticated_user_redirected_from_register(self, client):
         """Tests that an authenticated user is redirected from the register page."""
         # Log in an admin user
@@ -756,3 +787,49 @@ class TestRegisterRedirectRoute(BaseTest):
         assert b"MediArch" in response_followed.data  # Index page content
         assert b"Register" not in response_followed.data  # Should not be on register page
         client.get("/logout")
+
+    def test_register_with_invalid_account_type(self, client):
+        """Tests that a flash message is shown for invalid account type during registration."""
+        response = self.register_user(client, account_type_value="INVALID_TYPE")
+        assert response.status_code == 200  # Should stay on registration page
+        # WTForms will add an error to form.errors['account_type'] directly
+        assert b"Not a valid choice" in response.data  # Default WTForms error for invalid SelectField choice
+        assert b"Congratulations, you are now a registered user!" not in response.data
+
+    def test_register_admin_doctor_inactive_by_default(self, client, app):
+        """Tests that new admin/doctor accounts are inactive by default and show a flash message."""
+        # Test with Doctor
+        response_doctor = self.register_user(
+            client,
+            username="newdoctor",
+            email="newdoctor@example.com",
+            account_type_value=AccountType.DOCTOR.value,
+            first_name="New",  # Required by form, but not used for doctor user model directly
+            last_name="Doc"   # Required by form
+        )
+        assert response_doctor.status_code == 200  # Redirects to login after successful registration message
+        assert b"Administrator/Doctor accounts require activation by an existing administrator." in response_doctor.data
+
+        with app.app_context():
+            doctor_user = User.query.filter_by(email="newdoctor@example.com").first()
+            assert doctor_user is not None
+            assert not doctor_user.is_active
+
+        # Test with Admin (similar logic, ensuring 'admin' username is handled if special)
+        # Note: The main 'admin' user created in fixtures is active. This tests a new admin.
+        response_admin = self.register_user(
+            client,
+            username="newadmin",
+            email="newadmin@example.com",
+            account_type_value=AccountType.ADMIN.value,
+            first_name="New",
+            last_name="Adm"
+        )
+        assert response_admin.status_code == 200
+        assert b"Congratulations, you are now a registered user!" in response_admin.data
+        assert b"Administrator/Doctor accounts require activation by an existing administrator." in response_admin.data
+
+        with app.app_context():
+            admin_user = User.query.filter_by(email="newadmin@example.com").first()
+            assert admin_user is not None
+            assert not admin_user.is_active
