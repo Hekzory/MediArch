@@ -37,9 +37,17 @@
   
   <div class="mt-8 bg-dark-600 p-5 rounded-lg">
     <h3 class="text-lg font-semibold text-gray-100 mb-3">Medical Records</h3>
-    <p class="text-gray-300">
-      Medical records functionality will be added in a future update.
-    </p>
+    <div class="space-y-3 text-gray-300 mt-4">
+      <p><span class="font-medium text-gray-200">Blood Type:</span> {{ patient.blood_type.value if patient.blood_type else 'Not provided' }}</p>
+      <p><span class="font-medium text-gray-200">Allergies:</span></p>
+      <div class="pl-4 whitespace-pre-wrap">{{ patient.allergies or 'None listed' }}</div>
+      <p><span class="font-medium text-gray-200">Medical Conditions:</span></p>
+      <div class="pl-4 whitespace-pre-wrap">{{ patient.medical_conditions or 'None listed' }}</div>
+      <p><span class="font-medium text-gray-200">Medications:</span></p>
+      <div class="pl-4 whitespace-pre-wrap">{{ patient.medications or 'None listed' }}</div>
+      <p><span class="font-medium text-gray-200">Medical Notes:</span></p>
+      <div class="pl-4 whitespace-pre-wrap">{{ patient.notes or 'No notes' }}</div>
+    </div>
   </div>
 </div>
 {% endblock %} 

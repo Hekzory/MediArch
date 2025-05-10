@@ -27,12 +27,52 @@
     <div class="form-group">
       <label for="birth_date" class="block text-sm font-medium text-gray-300 mb-1">Birth Date</label>
       <input type="date" id="birth_date" name="birth_date" value="{{ patient.birth_date if patient and patient.birth_date else '' }}"
-            class="form-control bg-dark-700 text-gray-200">
+            class="form-control bg-dark-700 text-gray-200"
+            {% if patient and is_patient_editing_own and not can_edit_all_fields %}disabled{% endif %}>
+    </div>
+
+    <hr class="my-6 border-dark-500">
+    <h3 class="text-xl font-semibold text-gray-100 mb-4">Medical Information</h3>
+
+    {% set medical_fields_disabled = patient and is_patient_editing_own and not can_edit_all_fields %}
+
+    <div class="form-group">
+      <label for="blood_type" class="block text-sm font-medium text-gray-300 mb-1">Blood Type</label>
+      <select id="blood_type" name="blood_type" class="form-control bg-dark-700 text-gray-200" {% if medical_fields_disabled %}disabled{% endif %}>
+        <option value="">Select Blood Type</option>
+        {% for type in BloodType %}
+        <option value="{{ type.value }}" {% if patient and patient.blood_type == type %}selected{% endif %}>{{ type.value }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="allergies" class="block text-sm font-medium text-gray-300 mb-1">Allergies</label>
+      <textarea id="allergies" name="allergies" rows="3" class="form-control bg-dark-700 text-gray-200" {% if medical_fields_disabled %}disabled{% endif %}>{{ patient.allergies if patient else '' }}</textarea>
+    </div>
+
+    <div class="form-group">
+      <label for="medical_conditions" class="block text-sm font-medium text-gray-300 mb-1">Medical Conditions</label>
+      <textarea id="medical_conditions" name="medical_conditions" rows="3" class="form-control bg-dark-700 text-gray-200" {% if medical_fields_disabled %}disabled{% endif %}>{{ patient.medical_conditions if patient else '' }}</textarea>
+    </div>
+
+    <div class="form-group">
+      <label for="medications" class="block text-sm font-medium text-gray-300 mb-1">Medications</label>
+      <textarea id="medications" name="medications" rows="3" class="form-control bg-dark-700 text-gray-200" {% if medical_fields_disabled %}disabled{% endif %}>{{ patient.medications if patient else '' }}</textarea>
     </div>
     
+    <div class="form-group">
+      <label for="notes" class="block text-sm font-medium text-gray-300 mb-1">Medical Notes</label>
+      <textarea id="notes" name="notes" rows="4" class="form-control bg-dark-700 text-gray-200" {% if medical_fields_disabled %}disabled{% endif %}>{{ patient.notes if patient else '' }}</textarea>
+    </div>
+    
+    {% if medical_fields_disabled %}
+    <p class="text-sm text-yellow-400 mt-4">Patients cannot edit their own medical information. Please contact an administrator or doctor for changes.</p>
+    {% endif %}
+
     <div class="form-group mt-8 flex flex-wrap gap-3">
       <button type="submit" class="btn btn-primary">
-        {% if patient %}Update Patient{% else %}Add Patient{% endif %}
+        {% if patient %}Update card{% else %}Add Patient{% endif %}
       </button>
       <a href="{{ url_for('main.patients') }}" class="btn btn-secondary no-underline">Cancel</a>
     </div>

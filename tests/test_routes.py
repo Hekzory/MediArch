@@ -1,7 +1,7 @@
 import pytest
 
 from mediarch import create_app, db
-from mediarch.models import AccountType, Patient, User
+from mediarch.models import AccountType, BloodType, Patient, User
 
 
 @pytest.fixture
@@ -178,6 +178,25 @@ class TestAddPatientRoute(BaseTest):
         assert b"Patient added successfully" not in response_non_date.data
         client.get("/logout")
 
+    def test_add_patient_invalid_blood_type(self, client):
+        """Tests adding a patient with an invalid blood type value."""
+        self.login_user(client, email="admin@example.com")  # Admin or Doctor can add
+        response = client.post("/patients/add", data={
+            "first_name": "InvalidBlood",
+            "last_name": "TypePerson",
+            "birth_date": "1995-05-05",
+            "blood_type": "XYZ_INVALID"
+        }, follow_redirects=True)
+        assert response.status_code == 200  # Should stay on the form page
+        assert b"Invalid blood type value: XYZ_INVALID." in response.data
+        assert b"Patient added successfully" not in response.data
+
+        # Verify patient was not added
+        with client.application.app_context():
+            patient = Patient.query.filter_by(first_name="InvalidBlood").first()
+            assert patient is None
+        client.get("/logout")
+
 
 class TestViewPatientRoute(BaseTest):
     def test_admin_can_view_patient(self, client):
@@ -245,15 +264,36 @@ class TestEditPatientRoute(BaseTest):
         response_admin_edit = client.post("/patients/1/edit", data={
             "first_name": "JohnAdminEdited",
             "last_name": "DoeAdminEdited",
-            "birth_date": "1985-05-15"
+            "birth_date": "1985-05-15",
+            "blood_type": BloodType.A_POSITIVE.value,
+            "allergies": "Pollen",
+            "medical_conditions": "Hay fever",
+            "medications": "Antihistamines",
+            "notes": "Seasonal allergies noted by admin."
         }, follow_redirects=True)
         assert response_admin_edit.status_code == 200
         assert b"Patient updated successfully" in response_admin_edit.data
-        # Verify data in detail view
         detail_response = client.get("/patients/1")
         assert b"JohnAdminEdited" in detail_response.data
         assert b"DoeAdminEdited" in detail_response.data
         assert b"1985-05-15" in detail_response.data  # Assuming format is YYYY-MM-DD in detail view
+        assert BloodType.A_POSITIVE.value.encode() in detail_response.data
+        assert b"Pollen" in detail_response.data
+        assert b"Hay fever" in detail_response.data
+        assert b"Antihistamines" in detail_response.data
+        assert b"Seasonal allergies noted by admin." in detail_response.data
+
+        # Verify in DB as well
+        with client.application.app_context():
+            patient = db.session.get(Patient, 1)
+            assert patient.first_name == "JohnAdminEdited"
+            assert patient.last_name == "DoeAdminEdited"
+            assert patient.birth_date.strftime("%Y-%m-%d") == "1985-05-15"
+            assert patient.blood_type == BloodType.A_POSITIVE
+            assert patient.allergies == "Pollen"
+            assert patient.medical_conditions == "Hay fever"
+            assert patient.medications == "Antihistamines"
+            assert patient.notes == "Seasonal allergies noted by admin."
         client.get("/logout")
 
     def test_doctor_can_edit_patient(self, client):
@@ -262,7 +302,12 @@ class TestEditPatientRoute(BaseTest):
         response_doctor_edit = client.post("/patients/1/edit", data={
             "first_name": "JohnDoctorEdited",
             "last_name": "DoeDoctorEdited",
-            "birth_date": "1986-06-16"
+            "birth_date": "1986-06-16",
+            "blood_type": BloodType.O_NEGATIVE.value,
+            "allergies": "Peanuts",
+            "medical_conditions": "Nut allergy",
+            "medications": "EpiPen",
+            "notes": "Severe nut allergy noted by doctor."
         }, follow_redirects=True)
         assert response_doctor_edit.status_code == 200
         assert b"Patient updated successfully" in response_doctor_edit.data
@@ -270,6 +315,23 @@ class TestEditPatientRoute(BaseTest):
         assert b"JohnDoctorEdited" in detail_response_doc.data
         assert b"DoeDoctorEdited" in detail_response_doc.data
         assert b"1986-06-16" in detail_response_doc.data
+        assert BloodType.O_NEGATIVE.value.encode() in detail_response_doc.data
+        assert b"Peanuts" in detail_response_doc.data
+        assert b"Nut allergy" in detail_response_doc.data
+        assert b"EpiPen" in detail_response_doc.data
+        assert b"Severe nut allergy noted by doctor." in detail_response_doc.data
+
+        # Verify in DB as well
+        with client.application.app_context():
+            patient = db.session.get(Patient, 1)
+            assert patient.first_name == "JohnDoctorEdited"
+            assert patient.last_name == "DoeDoctorEdited"
+            assert patient.birth_date.strftime("%Y-%m-%d") == "1986-06-16"
+            assert patient.blood_type == BloodType.O_NEGATIVE
+            assert patient.allergies == "Peanuts"
+            assert patient.medical_conditions == "Nut allergy"
+            assert patient.medications == "EpiPen"
+            assert patient.notes == "Severe nut allergy noted by doctor."
         client.get("/logout")
 
     def test_patient_can_edit_own_card(self, client):
@@ -284,12 +346,16 @@ class TestEditPatientRoute(BaseTest):
             original_patient_card = db.session.get(Patient, own_patient_id)
             original_birth_date_str = original_patient_card.birth_date.strftime("%Y-%m-%d") \
                                     if original_patient_card.birth_date else ""
+            original_blood_type = original_patient_card.blood_type  # Could be None or Enum member
+            original_allergies = original_patient_card.allergies
 
-        # Patient edits own basic info (first, last name) and attempts to change birth_date
+        # Patient edits own basic info (first, last name) and attempts to change birth_date and blood_type
         response_patient_own_edit = client.post(f"/patients/{own_patient_id}/edit", data={
             "first_name": "PatEdited",
             "last_name": "UserEditedFinal",
-            "birth_date": "2000-01-01"  # Attempt to change birth date
+            "birth_date": "2000-01-01",  # Attempt to change birth date
+            "blood_type": BloodType.AB_POSITIVE.value,  # Attempt to change blood type
+            "allergies": "Dust Mites (Attempted)"  # Attempt to change medical field
         }, follow_redirects=True)
         assert response_patient_own_edit.status_code == 200
         assert b"Patient updated successfully" in response_patient_own_edit.data
@@ -305,6 +371,30 @@ class TestEditPatientRoute(BaseTest):
         else:  # If original birth date was None, it should remain effectively None or empty in display
             # This check depends on how None birth_date is rendered. Assuming it's not "2000-01-01"
             assert b"2000-01-01" not in detail_response_patient.data
+
+        # Verify medical fields were NOT changed
+        if original_blood_type:
+            assert original_blood_type.value.encode() in detail_response_patient.data
+        else:
+            assert BloodType.AB_POSITIVE.value.encode() not in detail_response_patient.data
+
+        if original_allergies:
+            assert original_allergies.encode() in detail_response_patient.data
+        else:
+            assert b"Dust Mites (Attempted)" not in detail_response_patient.data
+
+        # Check DB directly to be certain
+        with client.application.app_context():
+            updated_patient_card = db.session.get(Patient, own_patient_id)
+            assert updated_patient_card.first_name == "PatEdited"
+            assert updated_patient_card.last_name == "UserEditedFinal"
+            if original_birth_date_str:
+                assert updated_patient_card.birth_date.strftime("%Y-%m-%d") == original_birth_date_str
+            else:
+                assert updated_patient_card.birth_date is None
+            assert updated_patient_card.blood_type == original_blood_type
+            assert updated_patient_card.allergies == original_allergies
+
         client.get("/logout")
 
     def test_patient_cannot_edit_another_card(self, client):
@@ -337,6 +427,126 @@ class TestEditPatientRoute(BaseTest):
             "birth_date": "2000-01-01"
         }, follow_redirects=True)
         assert response_post.status_code == 404
+        client.get("/logout")
+
+    def test_admin_edit_patient_invalid_blood_type(self, client):
+        """Tests admin editing patient with an invalid blood type value."""
+        self.login_user(client, email="admin@example.com")
+        # Get original patient data to verify no unwanted changes
+        with client.application.app_context():
+            patient_before_edit = db.session.get(Patient, 1)
+            original_first_name = patient_before_edit.first_name
+            original_last_name = patient_before_edit.last_name
+            original_blood_type = patient_before_edit.blood_type
+
+        response = client.post("/patients/1/edit", data={
+            "first_name": original_first_name,  # Keep other fields the same
+            "last_name": original_last_name,
+            "birth_date": patient_before_edit.birth_date.strftime("%Y-%m-%d") if patient_before_edit.birth_date else "",
+            "blood_type": "INVALID_BLOOD_TYPE",
+            "allergies": patient_before_edit.allergies or "",
+            "medical_conditions": patient_before_edit.medical_conditions or "",
+            "medications": patient_before_edit.medications or "",
+            "notes": patient_before_edit.notes or ""
+        }, follow_redirects=True)
+
+        assert response.status_code == 200  # Stays on form page
+        assert b"Invalid blood type value: INVALID_BLOOD_TYPE." in response.data
+        assert b"Patient updated successfully" not in response.data
+
+        # Verify in DB that blood type was not changed
+        with client.application.app_context():
+            patient_after_edit = db.session.get(Patient, 1)
+            assert patient_after_edit.blood_type == original_blood_type
+            assert patient_after_edit.first_name == original_first_name  # Ensure other fields not changed
+        client.get("/logout")
+
+    def test_admin_edit_patient_invalid_birth_date_format(self, client):
+        """Tests admin editing patient with an invalid birth date format."""
+        self.login_user(client, email="admin@example.com")
+        with client.application.app_context():
+            patient_before_edit = db.session.get(Patient, 1)
+            original_birth_date = patient_before_edit.birth_date
+            original_first_name = patient_before_edit.first_name
+
+        response = client.post("/patients/1/edit", data={
+            "first_name": original_first_name,
+            "last_name": patient_before_edit.last_name,
+            "birth_date": "01-01-1990",  # Invalid format
+            "blood_type": patient_before_edit.blood_type.value if patient_before_edit.blood_type else "",
+            # Include other medical fields to ensure form submission is complete
+            "allergies": patient_before_edit.allergies or "",
+            "medical_conditions": patient_before_edit.medical_conditions or "",
+            "medications": patient_before_edit.medications or "",
+            "notes": patient_before_edit.notes or ""
+        }, follow_redirects=True)
+
+        assert response.status_code == 200  # Stays on form page
+        assert b"Invalid date format for birth date. Please use YYYY-MM-DD format." in response.data
+        assert b"Patient updated successfully" not in response.data
+
+        # Verify in DB that birth date was not changed
+        with client.application.app_context():
+            patient_after_edit = db.session.get(Patient, 1)
+            assert patient_after_edit.birth_date == original_birth_date
+            assert patient_after_edit.first_name == original_first_name  # Check other fields
+        client.get("/logout")
+
+    def test_admin_can_unset_patient_blood_type(self, client):
+        """Tests that an admin can unset (clear) a patient's blood type."""
+        self.login_user(client, email="admin@example.com")
+
+        # First, ensure Patient 1 has a blood type set
+        with client.application.app_context():
+            patient_to_edit = db.session.get(Patient, 1)
+            if not patient_to_edit:
+                # If patient 1 doesn't exist from fixture, create one for this test
+                patient_to_edit = Patient(id=1, first_name="TestForUnset",
+                                          last_name="BloodType", blood_type=BloodType.A_POSITIVE)
+                db.session.add(patient_to_edit)
+            elif patient_to_edit.blood_type is None:
+                patient_to_edit.blood_type = BloodType.B_POSITIVE  # Set a blood type if None
+            db.session.commit()
+            # Re-fetch to ensure we have the committed state
+            patient_to_edit = db.session.get(Patient, 1)
+            original_first_name = patient_to_edit.first_name
+            original_last_name = patient_to_edit.last_name
+            original_birth_date_str = patient_to_edit.birth_date.strftime("%Y-%m-%d") if \
+                patient_to_edit.birth_date else ""
+            original_allergies = patient_to_edit.allergies or ""
+            original_medical_conditions = patient_to_edit.medical_conditions or ""
+            original_medications = patient_to_edit.medications or ""
+            original_notes = patient_to_edit.notes or ""
+
+        assert patient_to_edit.blood_type is not None, "Patient should have a blood type before unsetting."
+
+        # Now, edit the patient and provide an empty string for blood_type
+        response_edit = client.post("/patients/1/edit", data={
+            "first_name": original_first_name,
+            "last_name": original_last_name,
+            "birth_date": original_birth_date_str,
+            "blood_type": "",  # Attempt to unset blood type
+            "allergies": original_allergies,
+            "medical_conditions": original_medical_conditions,
+            "medications": original_medications,
+            "notes": original_notes
+        }, follow_redirects=True)
+
+        assert response_edit.status_code == 200
+        assert b"Patient updated successfully" in response_edit.data
+
+        # Verify in detail view
+        detail_response = client.get("/patients/1")
+        assert b"Blood Type:</span> Not provided" in detail_response.data  # How None is displayed
+
+        # Verify in DB
+        with client.application.app_context():
+            updated_patient = db.session.get(Patient, 1)
+            assert updated_patient is not None
+            assert updated_patient.blood_type is None
+            # Ensure other fields remained the same
+            assert updated_patient.first_name == original_first_name
+
         client.get("/logout")
 
 

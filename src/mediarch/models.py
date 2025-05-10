@@ -14,6 +14,18 @@ class AccountType(enum.Enum):
     PATIENT = "patient"
 
 
+class BloodType(enum.Enum):
+    A_POSITIVE = "A+"
+    A_NEGATIVE = "A-"
+    B_POSITIVE = "B+"
+    B_NEGATIVE = "B-"
+    AB_POSITIVE = "AB+"
+    AB_NEGATIVE = "AB-"
+    O_POSITIVE = "O+"
+    O_NEGATIVE = "O-"
+    UNKNOWN = "Unknown"
+
+
 class Patient(db.Model):
     """Patient medical record data."""
 
@@ -23,6 +35,13 @@ class Patient(db.Model):
     first_name: Mapped[str] = mapped_column(nullable=False)
     last_name: Mapped[str] = mapped_column(nullable=False)
     birth_date: Mapped[date | None]
+
+    # Medical information
+    blood_type: Mapped[BloodType | None] = mapped_column(db.Enum(BloodType), nullable=True)
+    allergies: Mapped[str | None] = mapped_column(db.Text, nullable=True)  # Using Text for potentially longer entries
+    medical_conditions: Mapped[str | None] = mapped_column(db.Text, nullable=True)
+    medications: Mapped[str | None] = mapped_column(db.Text, nullable=True)
+    notes: Mapped[str | None] = mapped_column(db.Text, nullable=True)  # General medical notes
 
     # The relationship is now primarily defined by User.patient_id
     user_account: Mapped["User | None"] = relationship(back_populates="patient_card", uselist=False)

@@ -7,7 +7,7 @@ from werkzeug.exceptions import NotFound
 
 from . import db
 from .forms import LoginForm, RegistrationForm
-from .models import AccountType, Patient, User
+from .models import AccountType, BloodType, Patient, User
 
 bp = Blueprint("main", __name__)
 
@@ -15,7 +15,7 @@ bp = Blueprint("main", __name__)
 @bp.context_processor
 def inject_account_types():
     """Inject AccountType enum into all templates."""
-    return {"AccountType": AccountType}
+    return {"AccountType": AccountType, "BloodType": BloodType}
 
 
 @bp.before_request
@@ -219,6 +219,11 @@ def add_patient() -> str:
         first_name = request.form.get("first_name")
         last_name = request.form.get("last_name")
         birth_date_str = request.form.get("birth_date")
+        blood_type_str = request.form.get("blood_type")
+        allergies = request.form.get("allergies")
+        medical_conditions = request.form.get("medical_conditions")
+        medications = request.form.get("medications")
+        notes = request.form.get("notes")
 
         # Convert birth_date to date object if provided
         birth_date = None
@@ -229,11 +234,24 @@ def add_patient() -> str:
                 flash("Invalid date format for birth date. Please use YYYY-MM-DD format.", "danger")
                 return render_template("patient_form.html")
 
+        blood_type = None
+        if blood_type_str:
+            try:
+                blood_type = BloodType(blood_type_str)
+            except ValueError:
+                flash(f"Invalid blood type value: {blood_type_str}.", "danger")
+                return render_template("patient_form.html")
+
         # Create new patient
         new_patient = Patient(
             first_name=first_name,
             last_name=last_name,
-            birth_date=birth_date
+            birth_date=birth_date,
+            blood_type=blood_type,
+            allergies=allergies or None,
+            medical_conditions=medical_conditions or None,
+            medications=medications or None,
+            notes=notes or None
         )
 
         db.session.add(new_patient)
@@ -308,6 +326,25 @@ def edit_patient(patient_id: int) -> str:
                                            is_patient_editing_own=is_own_record_for_patient_user)
             else:
                 patient.birth_date = None
+
+            # Medical fields for Admin/Doctor
+            blood_type_str = request.form.get("blood_type")
+            if blood_type_str:
+                try:
+                    patient.blood_type = BloodType(blood_type_str)
+                except ValueError:
+                    flash(f"Invalid blood type value: {blood_type_str}.", "danger")
+                    return render_template("patient_form.html", patient=patient,
+                                           can_edit_all_fields=can_edit_all_fields,
+                                           is_patient_editing_own=is_own_record_for_patient_user)
+            else:
+                patient.blood_type = None  # Allow unsetting blood type
+
+            patient.allergies = request.form.get("allergies") or None
+            patient.medical_conditions = request.form.get("medical_conditions") or None
+            patient.medications = request.form.get("medications") or None
+            patient.notes = request.form.get("notes") or None
+
         elif is_own_record_for_patient_user:
             # Patient can only edit their first_name and last_name
             patient.first_name = new_first_name
