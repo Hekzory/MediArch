@@ -48,7 +48,7 @@
                 <td class="table-td">{{ user_item.patient_id if user_item.patient_id is not none else 'N/A' }}</td>
                 <td class="table-td space-x-2 flex items-center">
                     <a href="{{ url_for('main.admin_edit_user', user_id=user_item.id) }}" class="btn btn-primary text-xs !px-3 !py-1.5 whitespace-nowrap">Edit</a>
-                    {% if user_item.username != 'admin' %}
+                    {% if user_item.username != 'admin' and user_item.id != current_user.id %}
                         <form method="POST" action="{{ url_for('main.admin_toggle_user_active', user_id=user_item.id) }}" class="inline-block">
                             <button type="submit" 
                                     class="btn text-xs !px-3 !py-1.5 whitespace-nowrap 

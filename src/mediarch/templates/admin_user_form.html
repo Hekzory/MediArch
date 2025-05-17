@@ -47,13 +47,16 @@
 
         <div class="form-group">
             <label for="is_active" class="form-label">User Status</label>
-            <select id="is_active" name="is_active" class="form-control" {% if is_super_admin %}disabled{% endif %}>
+            <select id="is_active" name="is_active" class="form-control" {% if is_super_admin or user.id == current_user.id %}disabled{% endif %}>
                 <option value="true" {% if request.form.get('is_active', user.is_active|string) == 'true' %}selected{% endif %}>Active</option>
                 <option value="false" {% if request.form.get('is_active', user.is_active|string) == 'false' %}selected{% endif %}>Inactive / Pending Activation</option>
             </select>
             {% if is_super_admin %}
                 <input type="hidden" name="is_active" value="{{ user.is_active|string|lower }}" />
                 <p class="mt-1 text-xs text-gray-400">The primary 'admin' account is always active and cannot be deactivated.</p>
+            {% elif user.id == current_user.id %}
+                <input type="hidden" name="is_active" value="{{ user.is_active|string|lower }}" />
+                <p class="mt-1 text-xs text-gray-400">You cannot change your own active status.</p>
             {% endif %}
         </div>
 

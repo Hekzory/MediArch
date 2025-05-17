@@ -148,6 +148,15 @@ def admin_edit_user(user_id: int) -> str:
             flash("The primary 'admin' account cannot be deactivated.", "warning")
             # Optionally, revert new_is_active to True or simply don't apply the change if it was to False
 
+        if user_to_edit.id == current_user.id and not new_is_active:
+            flash("You cannot deactivate your own account. The active status was not changed.", "warning")
+            user_to_edit.is_active = True  # Ensure it remains active
+        elif not is_super_admin:  # Apply if not super admin and not self-deactivation attempt
+            user_to_edit.is_active = new_is_active
+        elif is_super_admin and not new_is_active:  # Super admin trying to deactivate self
+            flash("The primary 'admin' account cannot be deactivated.", "warning")
+            user_to_edit.is_active = True  # Ensure it remains active
+
         # Password change (optional)
         new_password = request.form.get("password")
         if new_password:
@@ -179,6 +188,10 @@ def admin_toggle_user_active(user_id: int) -> str:
 
     if user_to_toggle.username == "admin":
         flash("The primary 'admin' account cannot be deactivated.", "warning")
+        return redirect(url_for("main.admin_list_users"))
+
+    if user_to_toggle.id == current_user.id:
+        flash("You cannot deactivate your own account.", "warning")
         return redirect(url_for("main.admin_list_users"))
 
     user_to_toggle.is_active = not user_to_toggle.is_active

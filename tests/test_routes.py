@@ -695,6 +695,34 @@ class TestAdminToggleUserActiveRoute(BaseTest):
 
         client.get("/logout")
 
+    def test_admin_cannot_toggle_own_active_status_to_false(self, client, app):
+        """Tests that an admin cannot deactivate their own account via toggle."""
+        # Create another admin user (not the main 'admin')
+        with app.app_context():
+            another_admin = User(username="anotheradmin", email="anotheradmin@example.com",
+                                 account_type=AccountType.ADMIN, is_active=True)
+            another_admin.set_password("securepassword")
+            db.session.add(another_admin)
+            db.session.commit()
+            another_admin_id = another_admin.id
+
+        # Log in as this other admin
+        self.login_user(client, email="anotheradmin@example.com", password="securepassword")
+
+        # Attempt to toggle their own active status (which would deactivate them)
+        response_toggle_self = client.post(f"/admin/users/{another_admin_id}/toggle_active",
+                                           follow_redirects=True)
+        assert response_toggle_self.status_code == 200
+        assert b"You cannot deactivate your own account." in response_toggle_self.data
+
+        # Verify the admin is still active
+        with app.app_context():
+            admin_user_after_toggle = db.session.get(User, another_admin_id)
+            assert admin_user_after_toggle is not None
+            assert admin_user_after_toggle.is_active
+
+        client.get("/logout")
+
 
 class TestAdminDashboardRoute(BaseTest):
     def test_admin_can_access_dashboard(self, client):
@@ -841,7 +869,8 @@ class TestAdminEditUserRoute(BaseTest):
             "account_type": AccountType.PATIENT.value,
             "is_active": "true"
         }
-        response = client.post(f"/admin/users/{non_existent_user_id}/edit", data=edit_data, follow_redirects=True)
+        response = client.post(f"/admin/users/{non_existent_user_id}/edit",
+                               data=edit_data, follow_redirects=True)
 
         assert response.status_code == 200  # Should redirect to admin_list_users
         assert b"User with ID 99999 not found." in response.data
@@ -873,7 +902,8 @@ class TestAdminEditUserRoute(BaseTest):
             "account_type": AccountType.PATIENT.value,
             "is_active": "true"
         }
-        response_post = client.post(f"/admin/users/{user_id_to_try_edit}/edit", data=edit_data, follow_redirects=True)
+        response_post = client.post(f"/admin/users/{user_id_to_try_edit}/edit",
+                                    data=edit_data, follow_redirects=True)
         assert response_post.status_code == 403  # Forbidden
 
         client.get("/logout")
@@ -933,6 +963,45 @@ class TestAdminEditUserRoute(BaseTest):
         with app.app_context():
             user_after_attempt = db.session.get(User, user_id)
             assert user_after_attempt.account_type == AccountType.PATIENT
+
+        client.get("/logout")
+
+    def test_admin_cannot_deactivate_own_account_via_edit(self, client, app):
+        """Tests that an admin cannot set their own account to inactive via the edit form."""
+        # Create another admin user (not the main 'admin')
+        with app.app_context():
+            another_admin_editor = User(username="anotheradmineditor", email="anotheradmineditor@example.com",
+                                 account_type=AccountType.ADMIN, is_active=True)
+            another_admin_editor.set_password("securepasswordedit")
+            db.session.add(another_admin_editor)
+            db.session.commit()
+            another_admin_editor_id = another_admin_editor.id
+            original_username = another_admin_editor.username
+            original_email = another_admin_editor.email
+            original_account_type = another_admin_editor.account_type
+
+        # Log in as this other admin
+        self.login_user(client, email="anotheradmineditor@example.com", password="securepasswordedit")
+
+        edit_data_self_deactivate = {
+            "username": original_username,  # Keep other fields same
+            "email": original_email,
+            "account_type": original_account_type.value,
+            "is_active": "false"  # Attempt to set self to inactive
+        }
+        response = client.post(f"/admin/users/{another_admin_editor_id}/edit",
+                               data=edit_data_self_deactivate, follow_redirects=True)
+
+        assert response.status_code == 200  # Should redirect to user list after attempted save
+        # Check for flash message from routes.py
+        assert b"You cannot deactivate your own account. The active status was not changed." in response.data
+        assert b"User updated successfully." in response.data  # Other parts of the update might have succeeded
+
+        # Verify the admin is still active in the database
+        with app.app_context():
+            admin_user_after_edit = db.session.get(User, another_admin_editor_id)
+            assert admin_user_after_edit is not None
+            assert admin_user_after_edit.is_active is True
 
         client.get("/logout")
 

@@ -5,7 +5,11 @@
 {% block page_header %}
 <div class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
   <h2 class="text-2xl font-bold text-brand-light">{% if patient %}Edit Patient card{% else %}Add New Patient{% endif %}</h2>
-  <a href="{{ url_for('main.patients') }}" class="text-brand hover:text-brand-light transition-colors no-underline">Back to Patients</a>
+  {% if current_user.account_type == AccountType.PATIENT and current_user.patient_id %}
+    <a href="{{ url_for('main.view_patient', patient_id=current_user.patient_id) }}" class="text-brand hover:text-brand-light transition-colors no-underline">Back to My Card</a>
+  {% else %}
+    <a href="{{ url_for('main.patients') }}" class="text-brand hover:text-brand-light transition-colors no-underline">Back to Patients</a>
+  {% endif %}
 </div>
 {% endblock %}
 
@@ -74,7 +78,11 @@
       <button type="submit" class="btn btn-primary">
         {% if patient %}Update card{% else %}Add Patient{% endif %}
       </button>
-      <a href="{{ url_for('main.patients') }}" class="btn btn-secondary no-underline">Cancel</a>
+      {% if current_user.is_authenticated and current_user.account_type == AccountType.PATIENT and current_user.patient_id %}
+        <a href="{{ url_for('main.view_patient', patient_id=current_user.patient_id) }}" class="btn btn-secondary no-underline">Cancel</a>
+      {% else %}
+        <a href="{{ url_for('main.patients') }}" class="btn btn-secondary no-underline">Cancel</a>
+      {% endif %}
     </div>
   </form>
 </div>
